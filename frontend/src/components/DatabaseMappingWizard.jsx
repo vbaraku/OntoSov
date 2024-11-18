@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Stepper,
@@ -7,12 +7,12 @@ import {
   Typography,
   Paper,
   Container,
-  Button
-} from '@mui/material';
-import DatabaseConnectionForm from './DatabaseConnectionForm';
-import SchemaMapper from './SchemaMapper';
+  Button,
+} from "@mui/material";
+import DatabaseConnectionForm from "./DatabaseConnectionForm";
+import SchemaMapper from "./SchemaMapper";
 
-const steps = ['Connect Database', 'Map Schema'];
+const steps = ["Connect Database", "Map Schema"];
 
 const DatabaseMappingWizard = () => {
   const [activeStep, setActiveStep] = useState(0);
@@ -27,21 +27,29 @@ const DatabaseMappingWizard = () => {
     setActiveStep((prevStep) => prevStep - 1);
   };
 
-  const handleDatabaseConnect = (config) => {
-    setDbConfig(config);
-    // In a real application, you would fetch tables here
-    // For now, we'll use dummy data
-    setTables([
-      {
-        name: 'users',
-        columns: ['id', 'name', 'email', 'phone']
-      },
-      {
-        name: 'products',
-        columns: ['id', 'name', 'price', 'category']
-      }
-    ]);
-    handleNext();
+  const handleDatabaseConnect = async (config) => {
+    try {
+      const response = await fetch(
+        "http://localhost:8080/api/database/tables",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(config),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch tables");
+
+      const tablesData = await response.json();
+      setDbConfig(config);
+      setTables(tablesData);
+      handleNext();
+    } catch (error) {
+      console.error("Error fetching tables:", error);
+      // Handle error appropriately
+    }
   };
 
   const renderStepContent = (step) => {
@@ -56,12 +64,20 @@ const DatabaseMappingWizard = () => {
   };
 
   return (
-    <Container maxWidth="lg">
+    <Container
+      maxWidth="lg"
+      sx={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
+        py: 4,
+      }}
+    >
       <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
         <Typography variant="h4" align="center" gutterBottom>
           Database Configuration and Mapping
         </Typography>
-        
+
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {steps.map((label) => (
             <Step key={label}>
@@ -72,8 +88,8 @@ const DatabaseMappingWizard = () => {
 
         <Box>
           {renderStepContent(activeStep)}
-          
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
             {activeStep !== 0 && (
               <Button onClick={handleBack} sx={{ mr: 1 }}>
                 Back

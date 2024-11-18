@@ -59,12 +59,31 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
   const handleTestConnection = async () => {
     try {
       setTestStatus({ type: 'info', message: 'Testing connection...' });
-      // Here you would make an API call to test the connection
-      // For now, we'll simulate a successful connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const config = {
+        ...formData,
+        jdbcUrl: getJdbcUrl()
+      };
+  
+      const response = await fetch('http://localhost:8080/api/database/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config)
+      });
+  
+      if (!response.ok) {
+        throw new Error('Connection test failed');
+      }
+  
+      const result = await response.text();
       setTestStatus({ type: 'success', message: 'Connection successful!' });
     } catch (error) {
-      setTestStatus({ type: 'error', message: 'Connection failed: ' + error.message });
+      setTestStatus({ 
+        type: 'error', 
+        message: `Connection failed: ${error.message}` 
+      });
     }
   };
 
