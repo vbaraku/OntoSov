@@ -5,6 +5,7 @@ import { AuthProvider } from './components/AuthContext';
 import SignIn from './components/SignIn';
 import SignUp from './components/SignUp'
 import ProtectedRoute from './components/ProtectedRoute';
+import DatabaseMappingWizard from './components/DatabaseMappingWizard';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/subject" element={<SubjectPage />} />
             <Route path="/controller" element={<ControllerPage />} />
+            <Route path="/database-mapping" element={<DatabaseMappingWizard/>} />
           </Route>
         </Routes>
       </Router>
