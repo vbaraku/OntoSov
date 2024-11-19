@@ -17,110 +17,118 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Autocomplete,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 
-const SchemaMapper = ({ tables }) => {
+const SchemaMapper = ({ tables, dbConfig }) => {
   const [mappings, setMappings] = useState([]);
   const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumn, setSelectedColumn] = useState("");
-  const [selectedSchemaClass, setSelectedSchemaClass] = useState("");
-  const [selectedSchemaProperty, setSelectedSchemaProperty] = useState("");
+  const [selectedSchemaClass, setSelectedSchemaClass] = useState(null);
+  const [selectedSchemaProperty, setSelectedSchemaProperty] = useState(null);
   const [schemaClassOptions, setSchemaClassOptions] = useState([]);
   const [schemaPropertyOptions, setSchemaPropertyOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Schema.org common classes and properties (simplified for example)
-  const schemaClasses = ["Person", "Product", "Order", "Organization", "Place"];
-
-  const schemaProperties = {
-    Person: ["name", "email", "telephone", "address"],
-    Product: ["name", "description", "price", "category"],
-    Order: ["orderNumber", "orderDate", "price"],
-    Organization: ["name", "address", "telephone"],
-    Place: ["name", "address", "geo"],
-  };
+  const [saveStatus, setSaveStatus] = useState(null);
 
   const getColumnsForTable = (tableName) => {
     const table = tables.find((t) => t.name === tableName);
-    return table
-      ? table.columns.map((col) => ({
-          name: col.name,
-          type: col.type,
-        }))
-      : [];
+    return table ? table.columns : [];
   };
 
-  // Fetch schema classes with search
   const searchSchemaClasses = async (query) => {
+    if (!query) return;
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/classes?query=${query}`
+        `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(query)}`
       );
+      if (!response.ok) throw new Error("Failed to fetch schema classes");
       const data = await response.json();
       setSchemaClassOptions(data);
     } catch (error) {
-      console.error("Error fetching schema classes:", error);
+      console.error("Error:", error);
+      setSaveStatus({ type: "error", message: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch properties for selected class
   const fetchSchemaProperties = async (className) => {
+    if (!className) return;
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/properties/${className}`
+        `http://localhost:8080/api/schema/properties/${encodeURIComponent(className)}`
       );
+      if (!response.ok) throw new Error("Failed to fetch schema properties");
       const data = await response.json();
       setSchemaPropertyOptions(data);
     } catch (error) {
-      console.error("Error fetching schema properties:", error);
+      console.error("Error:", error);
+      setSaveStatus({ type: "error", message: error.message });
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddMapping = () => {
-    if (
-      selectedTable &&
-      selectedColumn &&
-      selectedSchemaClass &&
-      selectedSchemaProperty
-    ) {
+    if (selectedTable && selectedColumn && selectedSchemaClass && selectedSchemaProperty) {
       const newMapping = {
         id: Date.now(),
-        table: selectedTable,
-        column: selectedColumn,
+        databaseTable: selectedTable,
+        databaseColumn: selectedColumn,
         schemaClass: selectedSchemaClass,
         schemaProperty: selectedSchemaProperty,
       };
       setMappings([...mappings, newMapping]);
-      // Reset selection
       setSelectedColumn("");
-      setSelectedSchemaProperty("");
+      setSelectedSchemaProperty(null);
     }
   };
 
-  const handleDeleteMapping = (mappingId) => {
-    setMappings(mappings.filter((mapping) => mapping.id !== mappingId));
+  const handleSaveMapping = async () => {
+    try {
+      setSaveStatus({ type: "info", message: "Saving mappings..." });
+      
+      const mappingRequest = {
+        databaseConfig: dbConfig,
+        mappings: mappings.map(m => ({
+          databaseTable: m.databaseTable,
+          databaseColumn: m.databaseColumn,
+          schemaClass: m.schemaClass,
+          schemaProperty: m.schemaProperty
+        }))
+      };
+      console.log('Mapping request:', mappingRequest);
+
+      const response = await fetch("http://localhost:8080/api/database/save-mappings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mappingRequest)
+      });
+
+      if (!response.ok) throw new Error("Failed to save mappings");
+      setSaveStatus({ type: "success", message: "Mappings saved successfully!" });
+    } catch (error) {
+      console.error("Error:", error);
+      setSaveStatus({ type: "error", message: error.message });
+    }
   };
 
-  const handleSaveMapping = () => {
-    // Here you would typically send the mappings to your backend
-    console.log("Saving mappings:", mappings);
-  };
+
+  useEffect(() => {
+    if (selectedSchemaClass) {
+      fetchSchemaProperties(selectedSchemaClass);
+    }
+  }, [selectedSchemaClass]);
 
   return (
     <Box sx={{ maxWidth: 800, mx: "auto" }}>
-      <Typography variant="h6" gutterBottom>
-        Map Database to Schema.org
-      </Typography>
-
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={2}>
           <Grid item xs={6}>
@@ -144,17 +152,16 @@ const SchemaMapper = ({ tables }) => {
             <FormControl fullWidth>
               <InputLabel>Column</InputLabel>
               <Select
-                label="Column"
                 value={selectedColumn}
+                label="Column"
                 onChange={(e) => setSelectedColumn(e.target.value)}
                 disabled={!selectedTable}
               >
-                {selectedTable &&
-                  getColumnsForTable(selectedTable).map((column) => (
-                    <MenuItem key={column.name} value={column.name}>
-                      {column.name} ({column.type})
-                    </MenuItem>
-                  ))}
+                {getColumnsForTable(selectedTable).map((column) => (
+                  <MenuItem key={column.name} value={column.name}>
+                    {column.name} ({column.type})
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Grid>
@@ -162,16 +169,8 @@ const SchemaMapper = ({ tables }) => {
           <Grid item xs={6}>
             <Autocomplete
               value={selectedSchemaClass}
-              onChange={(event, newValue) => {
-                setSelectedSchemaClass(newValue);
-                if (newValue) {
-                  fetchSchemaProperties(newValue);
-                }
-              }}
-              onInputChange={(event, newInputValue) => {
-                setSearchQuery(newInputValue);
-                searchSchemaClasses(newInputValue);
-              }}
+              onChange={(_, newValue) => setSelectedSchemaClass(newValue)}
+              onInputChange={(_, newInputValue) => searchSchemaClasses(newInputValue)}
               options={schemaClassOptions}
               loading={loading}
               renderInput={(params) => (
@@ -182,9 +181,7 @@ const SchemaMapper = ({ tables }) => {
                     ...params.InputProps,
                     endAdornment: (
                       <>
-                        {loading ? (
-                          <CircularProgress color="inherit" size={20} />
-                        ) : null}
+                        {loading ? <CircularProgress color="inherit" size={20} /> : null}
                         {params.InputProps.endAdornment}
                       </>
                     ),
@@ -197,34 +194,13 @@ const SchemaMapper = ({ tables }) => {
           <Grid item xs={6}>
             <Autocomplete
               value={selectedSchemaProperty}
-              onChange={(event, newValue) =>
-                setSelectedSchemaProperty(newValue)
-              }
+              onChange={(_, newValue) => setSelectedSchemaProperty(newValue)}
               options={schemaPropertyOptions}
               disabled={!selectedSchemaClass}
               renderInput={(params) => (
                 <TextField {...params} label="Schema.org Property" />
               )}
             />
-          </Grid>
-
-          <Grid item xs={6}>
-            <FormControl fullWidth>
-              <InputLabel>Schema.org Property</InputLabel>
-              <Select
-                label="Schema.org Property"
-                value={selectedSchemaProperty}
-                onChange={(e) => setSelectedSchemaProperty(e.target.value)}
-                disabled={!selectedSchemaClass}
-              >
-                {selectedSchemaClass &&
-                  schemaProperties[selectedSchemaClass]?.map((prop) => (
-                    <MenuItem key={prop} value={prop}>
-                      {prop}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
           </Grid>
 
           <Grid item xs={12}>
@@ -245,6 +221,12 @@ const SchemaMapper = ({ tables }) => {
         </Grid>
       </Paper>
 
+      {saveStatus && (
+        <Alert severity={saveStatus.type} sx={{ mb: 2 }}>
+          {saveStatus.message}
+        </Alert>
+      )}
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -259,14 +241,14 @@ const SchemaMapper = ({ tables }) => {
           <TableBody>
             {mappings.map((mapping) => (
               <TableRow key={mapping.id}>
-                <TableCell>{mapping.table}</TableCell>
-                <TableCell>{mapping.column}</TableCell>
+                <TableCell>{mapping.databaseTable}</TableCell>
+                <TableCell>{mapping.databaseColumn}</TableCell>
                 <TableCell>{mapping.schemaClass}</TableCell>
                 <TableCell>{mapping.schemaProperty}</TableCell>
                 <TableCell>
                   <IconButton
                     size="small"
-                    onClick={() => handleDeleteMapping(mapping.id)}
+                    onClick={() => setMappings(mappings.filter(m => m.id !== mapping.id))}
                   >
                     <DeleteIcon />
                   </IconButton>

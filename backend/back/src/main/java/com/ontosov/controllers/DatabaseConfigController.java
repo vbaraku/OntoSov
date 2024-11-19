@@ -1,6 +1,7 @@
 package com.ontosov.controllers;
 
 import com.ontosov.dto.DatabaseConfigDTO;
+import com.ontosov.dto.MappingRequestDTO;
 import com.ontosov.dto.SchemaMappingDTO;
 import com.ontosov.dto.TableMetadataDTO;
 import com.ontosov.services.DatabaseConfigService;
@@ -33,11 +34,13 @@ public class DatabaseConfigController {
     }
 
     @PostMapping("/save-mappings")
-    public ResponseEntity<?> saveSchemaMappings(
-            @RequestBody List<SchemaMappingDTO> mappings
-    ) throws IOException {
-        databaseConfigService.saveSchemaMappings(mappings);
-        return ResponseEntity.ok().body("Schema mappings saved");
+    public ResponseEntity<Void> saveMappings(@RequestBody MappingRequestDTO request) {
+        try {
+            databaseConfigService.saveSchemaMappings(request);
+            return ResponseEntity.ok().build();
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @PostMapping("/tables")

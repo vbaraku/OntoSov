@@ -29,25 +29,30 @@ const DatabaseMappingWizard = () => {
 
   const handleDatabaseConnect = async (config) => {
     try {
-      const response = await fetch(
-        "http://localhost:8080/api/database/tables",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(config),
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to fetch tables");
-
-      const tablesData = await response.json();
+      // First save the config
+      const saveResponse = await fetch("http://localhost:8080/api/database/save-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config)
+      });
+  
+      if (!saveResponse.ok) throw new Error("Failed to save database config");
+  
+      // Then fetch tables
+      const tablesResponse = await fetch("http://localhost:8080/api/database/tables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config)
+      });
+  
+      if (!tablesResponse.ok) throw new Error("Failed to fetch tables");
+  
+      const tablesData = await tablesResponse.json();
       setDbConfig(config);
       setTables(tablesData);
       handleNext();
     } catch (error) {
-      console.error("Error fetching tables:", error);
+      console.error("Error:", error);
       // Handle error appropriately
     }
   };
@@ -57,7 +62,7 @@ const DatabaseMappingWizard = () => {
       case 0:
         return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} />;
       case 1:
-        return <SchemaMapper tables={tables} />;
+        return <SchemaMapper tables={tables} dbConfig={dbConfig}/>;
       default:
         return null;
     }
