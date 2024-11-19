@@ -4,9 +4,6 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Typography,
-  Paper,
-  Container,
   Button,
 } from "@mui/material";
 import DatabaseConnectionForm from "./DatabaseConnectionForm";
@@ -14,47 +11,50 @@ import SchemaMapper from "./SchemaMapper";
 
 const steps = ["Connect Database", "Map Schema"];
 
-const DatabaseMappingWizard = () => {
+const DatabaseMappingWizard = ({ onComplete }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [dbConfig, setDbConfig] = useState(null);
   const [tables, setTables] = useState([]);
 
-  const handleNext = () => {
-    setActiveStep((prevStep) => prevStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevStep) => prevStep - 1);
-  };
-
   const handleDatabaseConnect = async (config) => {
     try {
-      // First save the config
-      const saveResponse = await fetch("http://localhost:8080/api/database/save-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config)
-      });
-  
+      const saveResponse = await fetch(
+        "http://localhost:8080/api/database/save-config",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(config),
+        }
+      );
+
       if (!saveResponse.ok) throw new Error("Failed to save database config");
-  
-      // Then fetch tables
-      const tablesResponse = await fetch("http://localhost:8080/api/database/tables", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config)
-      });
-  
+
+      const tablesResponse = await fetch(
+        "http://localhost:8080/api/database/tables",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(config),
+        }
+      );
+
       if (!tablesResponse.ok) throw new Error("Failed to fetch tables");
-  
+
       const tablesData = await tablesResponse.json();
       setDbConfig(config);
       setTables(tablesData);
-      handleNext();
+      setActiveStep(1);
     } catch (error) {
       console.error("Error:", error);
-      // Handle error appropriately
     }
+  };
+
+  const handleMappingComplete = () => {
+    onComplete();
+  };
+
+  const handleBack = () => {
+    setActiveStep(0);
   };
 
   const renderStepContent = (step) => {
@@ -62,48 +62,42 @@ const DatabaseMappingWizard = () => {
       case 0:
         return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} />;
       case 1:
-        return <SchemaMapper tables={tables} dbConfig={dbConfig}/>;
+        return <SchemaMapper tables={tables} dbConfig={dbConfig} onComplete={handleMappingComplete} />;
       default:
         return null;
     }
   };
 
   return (
-    <Container
-      maxWidth="lg"
-      sx={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
-        py: 4,
-      }}
-    >
-      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
-          Database Configuration and Mapping
-        </Typography>
+    <Box sx={{ 
+      minHeight: '600px',
+      width: '800px',
+      margin: '0 auto',
+      p: 3,
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
 
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+      <Box sx={{ flex: 1 }}>
+        {renderStepContent(activeStep)}
+      </Box>
 
-        <Box>
-          {renderStepContent(activeStep)}
-
-          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-            {activeStep !== 0 && (
-              <Button onClick={handleBack} sx={{ mr: 1 }}>
-                Back
-              </Button>
-            )}
-          </Box>
-        </Box>
-      </Paper>
-    </Container>
+      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 'auto', pt: 2 }}>
+        {activeStep === 1 && (
+          <Button onClick={handleBack}>Back</Button>
+        )}
+        <Button onClick={onComplete} color="inherit" sx={{ ml: 'auto' }}>
+          Cancel
+        </Button>
+      </Box>
+    </Box>
   );
 };
 

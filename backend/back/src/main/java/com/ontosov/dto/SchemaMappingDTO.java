@@ -8,4 +8,11 @@ public class SchemaMappingDTO {
     private String databaseColumn;
     private String schemaClass;
     private String schemaProperty;
+
+    public SchemaMappingDTO(String databaseTable, String databaseColumn, String schemaClass, String schemaProperty) {
+        this.databaseTable = databaseTable;
+        this.databaseColumn = databaseColumn;
+        this.schemaClass = schemaClass;
+        this.schemaProperty = schemaProperty;
+    }
 }

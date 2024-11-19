@@ -104,8 +104,8 @@ export default function SignIn(props) {
         } else {
           sessionStorage.setItem("user", JSON.stringify(user));
         }
-        console.log("Login successful:", user);
-        navigate("/subject");
+
+        navigate(user.role === "SUBJECT" ? "/subject" : "/controller");
       } else {
         console.log("Invalid credentials");
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   TextField,
   Button,
@@ -8,32 +8,34 @@ import {
   Select,
   MenuItem,
   Alert,
-  Typography
-} from '@mui/material';
+  Typography,
+} from "@mui/material";
 
 const DatabaseConnectionForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
-    databaseType: '',
-    host: '',
-    port: '',
-    databaseName: '',
-    username: '',
-    password: ''
+    databaseType: "",
+    host: "",
+    port: "",
+    databaseName: "",
+    username: "",
+    password: "",
   });
   const [testStatus, setTestStatus] = useState(null);
 
   const databaseTypes = [
-    { value: 'postgresql', label: 'PostgreSQL', defaultPort: '5432' },
-    { value: 'mysql', label: 'MySQL', defaultPort: '3306' },
-    { value: 'sqlserver', label: 'SQL Server', defaultPort: '1433' },
-    { value: 'oracle', label: 'Oracle', defaultPort: '1521' }
+    { value: "postgresql", label: "PostgreSQL", defaultPort: "5432" },
+    { value: "mysql", label: "MySQL", defaultPort: "3306" },
+    { value: "sqlserver", label: "SQL Server", defaultPort: "1433" },
+    { value: "oracle", label: "Oracle", defaultPort: "1521" },
   ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      if (name === 'databaseType') {
-        const defaultPort = databaseTypes.find(db => db.value === value)?.defaultPort;
+    setFormData((prev) => {
+      if (name === "databaseType") {
+        const defaultPort = databaseTypes.find(
+          (db) => db.value === value
+        )?.defaultPort;
         return { ...prev, [name]: value, port: defaultPort || prev.port };
       }
       return { ...prev, [name]: value };
@@ -43,46 +45,49 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
   const getJdbcUrl = () => {
     const { databaseType, host, port, databaseName } = formData;
     switch (databaseType) {
-      case 'postgresql':
+      case "postgresql":
         return `jdbc:postgresql://${host}:${port}/${databaseName}`;
-      case 'mysql':
+      case "mysql":
         return `jdbc:mysql://${host}:${port}/${databaseName}`;
-      case 'sqlserver':
+      case "sqlserver":
         return `jdbc:sqlserver://${host}:${port};databaseName=${databaseName}`;
-      case 'oracle':
+      case "oracle":
         return `jdbc:oracle:thin:@${host}:${port}:${databaseName}`;
       default:
-        return '';
+        return "";
     }
   };
 
   const handleTestConnection = async () => {
     try {
-      setTestStatus({ type: 'info', message: 'Testing connection...' });
-      
+      setTestStatus({ type: "info", message: "Testing connection..." });
+
       const config = {
         ...formData,
-        jdbcUrl: getJdbcUrl()
+        jdbcUrl: getJdbcUrl(),
       };
-  
-      const response = await fetch('http://localhost:8080/api/database/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(config)
-      });
-  
+
+      const response = await fetch(
+        "http://localhost:8080/api/database/connect",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(config),
+        }
+      );
+
       if (!response.ok) {
-        throw new Error('Connection test failed');
+        throw new Error("Connection test failed");
       }
-  
+
       const result = await response.text();
-      setTestStatus({ type: 'success', message: 'Connection successful!' });
+      setTestStatus({ type: "success", message: "Connection successful!" });
     } catch (error) {
-      setTestStatus({ 
-        type: 'error', 
-        message: `Connection failed: ${error.message}` 
+      setTestStatus({
+        type: "error",
+        message: `Connection failed: ${error.message}`,
       });
     }
   };
@@ -91,13 +96,17 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
     e.preventDefault();
     const config = {
       ...formData,
-      jdbcUrl: getJdbcUrl()
+      jdbcUrl: getJdbcUrl(),
     };
     onSubmit(config);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 600, mx: 'auto' }}>
+    <Box
+      component="form"
+      onSubmit={handleSubmit}
+      sx={{ maxWidth: 600, mx: "auto" }}
+    >
       <Typography variant="h6" gutterBottom>
         Database Connection Details
       </Typography>
@@ -111,7 +120,7 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
           required
           label="Database Type"
         >
-          {databaseTypes.map(db => (
+          {databaseTypes.map((db) => (
             <MenuItem key={db.value} value={db.value}>
               {db.label}
             </MenuItem>
@@ -184,7 +193,7 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
         </Alert>
       )}
 
-      <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+      <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
         <Button
           variant="outlined"
           onClick={handleTestConnection}
@@ -195,7 +204,7 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
         <Button
           type="submit"
           variant="contained"
-          disabled={!testStatus?.type === 'success'}
+          disabled={!testStatus?.type === "success"}
         >
           Next
         </Button>

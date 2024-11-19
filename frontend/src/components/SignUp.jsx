@@ -1,19 +1,24 @@
 import * as React from "react";
 import { useContext, useState } from "react";
 import { AuthContext } from "./AuthContext";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import CssBaseline from "@mui/material/CssBaseline";
-import FormLabel from "@mui/material/FormLabel";
-import FormControl from "@mui/material/FormControl";
-import Link from "@mui/material/Link";
-import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
-import Stack from "@mui/material/Stack";
-import MuiCard from "@mui/material/Card";
-import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import {
+  Box,
+  Button,
+  CssBaseline,
+  FormLabel,
+  FormControl,
+  Link,
+  TextField,
+  Typography,
+  Stack,
+  Card as MuiCard,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  styled,
+} from "@mui/material";
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: "flex",
@@ -55,21 +60,22 @@ const SignUpContainer = styled(Stack)(({ theme }) => ({
   }),
 }));
 
-export default function SignUp(props) {
-  const [emailError, setEmailError] = React.useState(false);
-  const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
-  const [passwordError, setPasswordError] = React.useState(false);
-  const [passwordErrorMessage, setPasswordErrorMessage] = React.useState("");
-  const [taxidError, setTaxidError] = React.useState(false);
-  const [taxidErrorMessage, setTaxidErrorMessage] = React.useState("");
+export default function SignUp() {
+  const [role, setRole] = useState("SUBJECT");
+  const [emailError, setEmailError] = useState(false);
+  const [emailErrorMessage, setEmailErrorMessage] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState("");
+  const [taxidError, setTaxidError] = useState(false);
+  const [taxidErrorMessage, setTaxidErrorMessage] = useState("");
+  const [nameError, setNameError] = useState(false);
+  const [nameErrorMessage, setNameErrorMessage] = useState("");
   const { setUser } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const validateInputs = () => {
     const email = document.getElementById("email");
     const password = document.getElementById("password");
-    const taxid = document.getElementById("taxid");
-
     let isValid = true;
 
     if (!email.value || !/\S+@\S+\.\S+/.test(email.value)) {
@@ -90,13 +96,26 @@ export default function SignUp(props) {
       setPasswordErrorMessage("");
     }
 
-    if (!taxid.value || taxid.value.length < 1) {
-      setTaxidError(true);
-      setTaxidErrorMessage("Tax ID is required.");
-      isValid = false;
+    if (role === "SUBJECT") {
+      const taxid = document.getElementById("taxid");
+      if (!taxid.value || taxid.value.length < 1) {
+        setTaxidError(true);
+        setTaxidErrorMessage("Tax ID is required.");
+        isValid = false;
+      } else {
+        setTaxidError(false);
+        setTaxidErrorMessage("");
+      }
     } else {
-      setTaxidError(false);
-      setTaxidErrorMessage("");
+      const name = document.getElementById("name");
+      if (!name.value || name.value.length < 1) {
+        setNameError(true);
+        setNameErrorMessage("Name is required.");
+        isValid = false;
+      } else {
+        setNameError(false);
+        setNameErrorMessage("");
+      }
     }
 
     return isValid;
@@ -105,37 +124,30 @@ export default function SignUp(props) {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    // Validate inputs directly within handleSubmit
     if (!validateInputs()) {
-      return; // Exit if validation fails
+      return;
     }
 
     const form = event.currentTarget;
-    const taxid = form.elements.taxid?.value;
-    const email = form.elements.email?.value;
-    const password = form.elements.password?.value;
-
-    console.log("Submitting signup with:", { taxid, email, password });
+    const formData = {
+      email: form.elements.email?.value,
+      password: form.elements.password?.value,
+      role: role,
+      ...(role === "SUBJECT"
+        ? { taxid: form.elements.taxid?.value }
+        : { name: form.elements.name?.value }),
+    };
 
     try {
-      console.log("Sending signup request to server...");
-      const response = await axios.post("http://localhost:8080/auth/signup", {
-        taxid,
-        email,
-        password,
-      });
-      console.log("Signup request sent");
-
+      const response = await axios.post(
+        "http://localhost:8080/auth/signup",
+        formData
+      );
       if (response.status === 200) {
         const user = response.data;
-        setUser(user); // Set user in your app’s state
+        setUser(user);
         sessionStorage.setItem("user", JSON.stringify(user));
-
-        // Redirect to the login page or another relevant page upon successful signup
-        console.log("Signup successful:", user);
-        navigate("/subject");
-      } else {
-        console.log("Signup failed");
+        navigate(role === "SUBJECT" ? "/subject" : "/controller");
       }
     } catch (error) {
       console.error("Error during signup:", error);
@@ -144,16 +156,13 @@ export default function SignUp(props) {
 
   return (
     <>
-      {/* <AppTheme {...props}> */}
       <CssBaseline enableColorScheme />
-      {/* <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} /> */}
       <SignUpContainer
         direction="column"
         justifyContent="space-between"
         alignContent="center"
       >
         <Card variant="outlined">
-          {/* <SitemarkIcon /> */}
           <Typography
             component="h1"
             variant="h4"
@@ -167,19 +176,57 @@ export default function SignUp(props) {
             sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
             <FormControl>
-              <FormLabel htmlFor="taxid">Tax ID</FormLabel>
-              <TextField
-                autoComplete="taxid"
-                name="taxid"
-                required
-                fullWidth
-                id="taxid"
-                placeholder="123456789"
-                error={taxidError}
-                helperText={taxidErrorMessage}
-                color={taxidError ? "error" : "primary"}
-              />
+              <FormLabel>Role</FormLabel>
+              <RadioGroup
+                row
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+              >
+                <FormControlLabel
+                  value="SUBJECT"
+                  control={<Radio />}
+                  label="Subject"
+                />
+                <FormControlLabel
+                  value="CONTROLLER"
+                  control={<Radio />}
+                  label="Controller"
+                />
+              </RadioGroup>
             </FormControl>
+
+            {role === "SUBJECT" ? (
+              <FormControl>
+                <FormLabel htmlFor="taxid">Tax ID</FormLabel>
+                <TextField
+                  autoComplete="taxid"
+                  name="taxid"
+                  required
+                  fullWidth
+                  id="taxid"
+                  placeholder="123456789"
+                  error={taxidError}
+                  helperText={taxidErrorMessage}
+                  color={taxidError ? "error" : "primary"}
+                />
+              </FormControl>
+            ) : (
+              <FormControl>
+                <FormLabel htmlFor="name">Name</FormLabel>
+                <TextField
+                  autoComplete="name"
+                  name="name"
+                  required
+                  fullWidth
+                  id="name"
+                  placeholder="Organisation Name"
+                  error={nameError}
+                  helperText={nameErrorMessage}
+                  color={nameError ? "error" : "primary"}
+                />
+              </FormControl>
+            )}
+
             <FormControl>
               <FormLabel htmlFor="email">Email</FormLabel>
               <TextField
@@ -192,9 +239,10 @@ export default function SignUp(props) {
                 variant="outlined"
                 error={emailError}
                 helperText={emailErrorMessage}
-                color={passwordError ? "error" : "primary"}
+                color={emailError ? "error" : "primary"}
               />
             </FormControl>
+
             <FormControl>
               <FormLabel htmlFor="password">Password</FormLabel>
               <TextField
@@ -211,10 +259,7 @@ export default function SignUp(props) {
                 color={passwordError ? "error" : "primary"}
               />
             </FormControl>
-            {/* <FormControlLabel
-              control={<Checkbox value="allowExtraEmails" color="primary" />}
-              label="I want to receive updates via email."
-            /> */}
+
             <Button
               type="submit"
               fullWidth
@@ -223,6 +268,7 @@ export default function SignUp(props) {
             >
               Sign up
             </Button>
+
             <Typography sx={{ textAlign: "center" }}>
               Already have an account?{" "}
               <span>
@@ -236,30 +282,8 @@ export default function SignUp(props) {
               </span>
             </Typography>
           </Box>
-          {/* <Divider>
-            <Typography sx={{ color: 'text.secondary' }}>or</Typography>
-          </Divider>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert('Sign up with Google')}
-              startIcon={<GoogleIcon />}
-            >
-              Sign up with Google
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => alert('Sign up with Facebook')}
-              startIcon={<FacebookIcon />}
-            >
-              Sign up with Facebook
-            </Button>
-          </Box> */}
         </Card>
       </SignUpContainer>
-      {/* </AppTheme> */}
     </>
   );
 }

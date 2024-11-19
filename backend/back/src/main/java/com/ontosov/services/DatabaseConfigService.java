@@ -9,14 +9,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.sql.DriverManager.getConnection;
 
@@ -68,26 +68,22 @@ public class DatabaseConfigService {
     }
 
     public void saveSchemaMappings(MappingRequestDTO request) throws IOException {
-        List<SchemaMappingDTO> mappings = request.mappings();
-        if (mappings == null || mappings.isEmpty()) {
-            throw new IllegalArgumentException("No mappings provided");
-        }
-
-        String primaryKeyColumn = getPrimaryKeyColumn(request.databaseConfig(),
-                mappings.get(0).getDatabaseTable());
-
+        Map<String, String> primaryKeys = new HashMap<>();
         StringBuilder obdaContent = new StringBuilder();
+
+        // Header
         obdaContent.append("[PrefixDeclaration]\n")
                 .append(":       http://example.org/resource#\n")
                 .append("schema: http://schema.org/\n")
                 .append("xsd:    http://www.w3.org/2001/XMLSchema#\n\n")
                 .append("[MappingDeclaration] @collection [[\n");
 
-        for (SchemaMappingDTO mapping : mappings) {
-            if (mapping.getDatabaseTable() == null || mapping.getDatabaseColumn() == null ||
-                    mapping.getSchemaClass() == null || mapping.getSchemaProperty() == null) {
-                throw new IllegalArgumentException("Mapping contains null values");
-            }
+        for (SchemaMappingDTO mapping : request.mappings()) {
+            // Get or fetch primary key for this table
+            String primaryKey = primaryKeys.computeIfAbsent(
+                    mapping.getDatabaseTable(),
+                    table -> getPrimaryKeyColumn(request.databaseConfig(), table)
+            );
 
             String mappingId = String.format("%s_%s_%s_Mapping",
                     mapping.getDatabaseTable(),
@@ -96,15 +92,15 @@ public class DatabaseConfigService {
 
             obdaContent.append(String.format("mappingId %s\n", mappingId))
                     .append(String.format("target :Resource/{%s} a schema:%s . ",
-                            primaryKeyColumn,
+                            primaryKey,
                             mapping.getSchemaClass()))
                     .append(String.format(":Resource/{%s} schema:%s \"%s\"^^xsd:string .\n",
-                            primaryKeyColumn,
+                            primaryKey,
                             mapping.getSchemaProperty(),
                             "{" + mapping.getDatabaseColumn() + "}"))
                     .append(String.format("source SELECT %s, %s FROM %s\n\n",
-                            primaryKeyColumn,
-                            mapping.getDatabaseColumn(),
+                            primaryKey,
+                            mapping.getDatabaseColumn().equals(primaryKey) ? primaryKey + " as id" : mapping.getDatabaseColumn(),
                             mapping.getDatabaseTable()));
         }
 
@@ -123,6 +119,40 @@ public class DatabaseConfigService {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to get primary key for table: " + tableName, e);
         }
+    }
+
+    public List<SchemaMappingDTO> loadExistingMappings() throws IOException {
+        List<SchemaMappingDTO> mappings = new ArrayList<>();
+        String content = Files.readString(Paths.get(OBDA_FILE_PATH));
+
+        // Parse mappings section
+        int mappingsStart = content.indexOf("[MappingDeclaration]");
+        if (mappingsStart == -1) return mappings;
+
+        String[] mappingBlocks = content.substring(mappingsStart)
+                .split("mappingId");
+
+        for (String block : mappingBlocks) {
+            if (block.trim().isEmpty()) continue;
+
+            // Extract mapping components using regex
+            Pattern targetPattern = Pattern.compile(":Resource/\\{(.+?)\\} a schema:(.+?) \\. :Resource/\\{\\1\\} schema:(.+?) \"\\{(.+?)\\}\"");
+            Pattern sourcePattern = Pattern.compile("source SELECT .+?, (.+?) FROM (.+?)\\n");
+
+            Matcher targetMatcher = targetPattern.matcher(block);
+            Matcher sourceMatcher = sourcePattern.matcher(block);
+
+            if (targetMatcher.find() && sourceMatcher.find()) {
+                mappings.add(new SchemaMappingDTO(
+                        sourceMatcher.group(2).trim(),  // table
+                        sourceMatcher.group(1).trim(),  // column
+                        targetMatcher.group(2).trim(),  // schemaClass
+                        targetMatcher.group(3).trim()   // schemaProperty
+                ));
+            }
+        }
+
+        return mappings;
     }
 
 
