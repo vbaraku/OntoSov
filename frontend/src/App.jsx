@@ -1,11 +1,16 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import SubjectPage from './pages/SubjectPage';
-import ControllerPage from './pages/ControllerPage';
-import { AuthProvider } from './components/AuthContext';
-import SignIn from './components/SignIn';
-import SignUp from './components/SignUp'
-import ProtectedRoute from './components/ProtectedRoute';
-import DatabaseMappingWizard from './components/DatabaseMappingWizard';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import SubjectPage from "./pages/SubjectPage";
+import ControllerPage from "./pages/ControllerPage";
+import { AuthProvider } from "./components/AuthContext";
+import SignIn from "./components/SignIn";
+import SignUp from "./components/SignUp";
+import ProtectedRoute from "./components/ProtectedRoute";
+import DatabaseMappingWizard from "./components/DatabaseMappingWizard";
 
 function App() {
   return (
@@ -17,7 +22,10 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/subject" element={<SubjectPage />} />
             <Route path="/controller" element={<ControllerPage />} />
-            <Route path="/database-mapping" element={<DatabaseMappingWizard/>} />
+            <Route
+              path="/database-mapping"
+              element={<DatabaseMappingWizard />}
+            />
           </Route>
         </Routes>
       </Router>

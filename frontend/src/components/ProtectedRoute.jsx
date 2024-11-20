@@ -1,15 +1,19 @@
-import React, { useContext, useRef } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { AuthContext } from './AuthContext';
+import React, { useContext, useRef } from "react";
+import { Navigate, Outlet } from "react-router-dom";
+import { AuthContext } from "./AuthContext";
 
 const ProtectedRoute = () => {
   const { user } = useContext(AuthContext);
 
   // If the user is not logged in, redirect to the authentication page
-  console.log("protected route")
-  console.log(sessionStorage.getItem('user'))
+  console.log("protected route");
+  console.log(sessionStorage.getItem("user"));
 
-  if (!user && !localStorage.getItem('user') && !sessionStorage.getItem('user')) {
+  if (
+    !user &&
+    !localStorage.getItem("user") &&
+    !sessionStorage.getItem("user")
+  ) {
     return <Navigate to="/signin" replace />;
   }
 

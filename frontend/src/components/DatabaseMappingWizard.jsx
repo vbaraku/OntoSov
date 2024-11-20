@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Stepper,
-  Step,
-  StepLabel,
-  Button,
-} from "@mui/material";
+import { Box, Stepper, Step, StepLabel, Button } from "@mui/material";
 import DatabaseConnectionForm from "./DatabaseConnectionForm";
 import SchemaMapper from "./SchemaMapper";
 
@@ -62,21 +56,29 @@ const DatabaseMappingWizard = ({ onComplete }) => {
       case 0:
         return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} />;
       case 1:
-        return <SchemaMapper tables={tables} dbConfig={dbConfig} onComplete={handleMappingComplete} />;
+        return (
+          <SchemaMapper
+            tables={tables}
+            dbConfig={dbConfig}
+            onComplete={handleMappingComplete}
+          />
+        );
       default:
         return null;
     }
   };
 
   return (
-    <Box sx={{ 
-      minHeight: '600px',
-      width: '800px',
-      margin: '0 auto',
-      p: 3,
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <Box
+      sx={{
+        minHeight: "600px",
+        width: "800px",
+        margin: "0 auto",
+        p: 3,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
         {steps.map((label) => (
           <Step key={label}>
@@ -85,15 +87,18 @@ const DatabaseMappingWizard = ({ onComplete }) => {
         ))}
       </Stepper>
 
-      <Box sx={{ flex: 1 }}>
-        {renderStepContent(activeStep)}
-      </Box>
+      <Box sx={{ flex: 1 }}>{renderStepContent(activeStep)}</Box>
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 'auto', pt: 2 }}>
-        {activeStep === 1 && (
-          <Button onClick={handleBack}>Back</Button>
-        )}
-        <Button onClick={onComplete} color="inherit" sx={{ ml: 'auto' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          mt: "auto",
+          pt: 2,
+        }}
+      >
+        {activeStep === 1 && <Button onClick={handleBack}>Back</Button>}
+        <Button onClick={onComplete} color="inherit" sx={{ ml: "auto" }}>
           Cancel
         </Button>
       </Box>

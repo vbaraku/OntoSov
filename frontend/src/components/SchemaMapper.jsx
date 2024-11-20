@@ -45,7 +45,9 @@ const SchemaMapper = ({ tables, dbConfig }) => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(query)}`
+        `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(
+          query
+        )}`
       );
       if (!response.ok) throw new Error("Failed to fetch schema classes");
       const data = await response.json();
@@ -63,7 +65,9 @@ const SchemaMapper = ({ tables, dbConfig }) => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/properties/${encodeURIComponent(className)}`
+        `http://localhost:8080/api/schema/properties/${encodeURIComponent(
+          className
+        )}`
       );
       if (!response.ok) throw new Error("Failed to fetch schema properties");
       const data = await response.json();
@@ -77,7 +81,12 @@ const SchemaMapper = ({ tables, dbConfig }) => {
   };
 
   const handleAddMapping = () => {
-    if (selectedTable && selectedColumn && selectedSchemaClass && selectedSchemaProperty) {
+    if (
+      selectedTable &&
+      selectedColumn &&
+      selectedSchemaClass &&
+      selectedSchemaProperty
+    ) {
       const newMapping = {
         id: Date.now(),
         databaseTable: selectedTable,
@@ -94,32 +103,37 @@ const SchemaMapper = ({ tables, dbConfig }) => {
   const handleSaveMapping = async () => {
     try {
       setSaveStatus({ type: "info", message: "Saving mappings..." });
-      
+
       const mappingRequest = {
         databaseConfig: dbConfig,
-        mappings: mappings.map(m => ({
+        mappings: mappings.map((m) => ({
           databaseTable: m.databaseTable,
           databaseColumn: m.databaseColumn,
           schemaClass: m.schemaClass,
-          schemaProperty: m.schemaProperty
-        }))
+          schemaProperty: m.schemaProperty,
+        })),
       };
-      console.log('Mapping request:', mappingRequest);
+      console.log("Mapping request:", mappingRequest);
 
-      const response = await fetch("http://localhost:8080/api/database/save-mappings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mappingRequest)
-      });
+      const response = await fetch(
+        "http://localhost:8080/api/database/save-mappings",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mappingRequest),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to save mappings");
-      setSaveStatus({ type: "success", message: "Mappings saved successfully!" });
+      setSaveStatus({
+        type: "success",
+        message: "Mappings saved successfully!",
+      });
     } catch (error) {
       console.error("Error:", error);
       setSaveStatus({ type: "error", message: error.message });
     }
   };
-
 
   useEffect(() => {
     if (selectedSchemaClass) {
@@ -170,7 +184,9 @@ const SchemaMapper = ({ tables, dbConfig }) => {
             <Autocomplete
               value={selectedSchemaClass}
               onChange={(_, newValue) => setSelectedSchemaClass(newValue)}
-              onInputChange={(_, newInputValue) => searchSchemaClasses(newInputValue)}
+              onInputChange={(_, newInputValue) =>
+                searchSchemaClasses(newInputValue)
+              }
               options={schemaClassOptions}
               loading={loading}
               renderInput={(params) => (
@@ -181,7 +197,9 @@ const SchemaMapper = ({ tables, dbConfig }) => {
                     ...params.InputProps,
                     endAdornment: (
                       <>
-                        {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                        {loading ? (
+                          <CircularProgress color="inherit" size={20} />
+                        ) : null}
                         {params.InputProps.endAdornment}
                       </>
                     ),
@@ -248,7 +266,9 @@ const SchemaMapper = ({ tables, dbConfig }) => {
                 <TableCell>
                   <IconButton
                     size="small"
-                    onClick={() => setMappings(mappings.filter(m => m.id !== mapping.id))}
+                    onClick={() =>
+                      setMappings(mappings.filter((m) => m.id !== mapping.id))
+                    }
                   >
                     <DeleteIcon />
                   </IconButton>
