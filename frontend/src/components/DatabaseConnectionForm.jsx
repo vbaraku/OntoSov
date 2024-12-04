@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   TextField,
   Button,
@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 
-const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add controllerId prop
+const DatabaseConnectionForm = ({ onSubmit, controllerId, initialData = null, isEditMode = false }) => {
   const [formData, setFormData] = useState({
     databaseType: "",
     host: "",
@@ -20,7 +20,22 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
     username: "",
     password: "",
   });
-  const [testStatus, setTestStatus] = useState(null);
+  const [testStatus, setTestStatus] = useState(isEditMode ? { type: "success", message: "Connection verified" } : null);
+
+  // Initialize form with existing data if provided
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        databaseType: initialData.databaseType || "",
+        host: initialData.host || "",
+        port: initialData.port || "",
+        databaseName: initialData.databaseName || "",
+        username: initialData.username || "",
+        password: "", // Don't set the password from initialData
+        id: initialData.id, // Preserve the database ID for updates
+      });
+    }
+  }, [initialData]);
 
   const databaseTypes = [
     { value: "postgresql", label: "PostgreSQL", defaultPort: "5432" },
@@ -62,9 +77,11 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
     try {
       setTestStatus({ type: "info", message: "Testing connection..." });
 
-      const config = {
+      const configToTest = {
         ...formData,
         jdbcUrl: getJdbcUrl(),
+        // In edit mode, use existing password if no new one is provided
+        password: formData.password || (initialData?.password || '')
       };
 
       const response = await fetch(
@@ -74,7 +91,7 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(config),
+          body: JSON.stringify(configToTest),
         }
       );
 
@@ -82,7 +99,6 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
         throw new Error("Connection test failed");
       }
 
-      const result = await response.text();
       setTestStatus({ type: "success", message: "Connection successful!" });
     } catch (error) {
       setTestStatus({
@@ -97,6 +113,10 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
     const config = {
       ...formData,
       jdbcUrl: getJdbcUrl(),
+      // In edit mode, use existing password if no new one is provided
+      password: formData.password || (initialData?.password || ''),
+      // Preserve the ID in edit mode
+      id: initialData?.id
     };
 
     try {
@@ -131,7 +151,7 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
       sx={{ maxWidth: 600, mx: "auto" }}
     >
       <Typography variant="h6" gutterBottom>
-        Database Connection Details
+        {isEditMode ? "Edit Database Connection" : "New Database Connection"}
       </Typography>
 
       <FormControl fullWidth margin="normal">
@@ -194,12 +214,13 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
       <TextField
         fullWidth
         margin="normal"
-        label="Password"
+        label={isEditMode ? "New Password (optional)" : "Password"}
         name="password"
         type="password"
         value={formData.password}
         onChange={handleChange}
-        required
+        required={!isEditMode}
+        helperText={isEditMode ? "Leave blank to keep existing password" : ""}
       />
 
       {formData.databaseType && (
@@ -227,9 +248,9 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add control
         <Button
           type="submit"
           variant="contained"
-          disabled={!testStatus?.type === "success"}
+          disabled={!isEditMode && testStatus?.type !== "success"}
         >
-          Next
+          {isEditMode ? "Next" : "Connect"}
         </Button>
       </Box>
     </Box>

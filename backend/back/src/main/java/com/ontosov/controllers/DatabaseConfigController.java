@@ -47,6 +47,16 @@ public class DatabaseConfigController {
         }
     }
 
+    @GetMapping("/mappings/{controllerId}")
+    public ResponseEntity<List<SchemaMappingDTO>> getMappings(@PathVariable Long controllerId) {
+        try {
+            List<SchemaMappingDTO> mappings = databaseConfigService.getMappings(controllerId);
+            return ResponseEntity.ok(mappings);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/controller/{controllerId}/databases")
     public ResponseEntity<List<DatabaseConfigDTO>> getDatabasesForController(
             @PathVariable Long controllerId) {

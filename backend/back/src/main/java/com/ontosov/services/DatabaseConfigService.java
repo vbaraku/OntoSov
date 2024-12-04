@@ -10,6 +10,8 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.DriverManager;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,23 +31,24 @@ public class DatabaseConfigService {
     }
 
     public void saveDatabaseConfiguration(DatabaseConfigDTO configDTO, Long controllerId) throws IOException {
-        // Create controller directory if it doesn't exist
         String configPath = getConfigPath(controllerId);
         Files.createDirectories(Paths.get(configPath).getParent());
 
         Properties properties = new Properties();
-
-        // Load existing properties if file exists
         if (Files.exists(Paths.get(configPath))) {
             try (Reader reader = Files.newBufferedReader(Paths.get(configPath))) {
                 properties.load(reader);
             }
         }
 
-        // Generate a unique ID for this database if it's new
-        String dbId = configDTO.getId() != null ?
-                configDTO.getId().toString() :
-                UUID.randomUUID().toString();
+        // Check if this database already exists based on JDBC URL and name
+        String existingId = findExistingDatabaseId(properties, configDTO);
+        String dbId = existingId != null ? existingId :
+                (configDTO.getId() != null ? configDTO.getId() :
+                        UUID.randomUUID().toString());
+
+        // Remove any existing properties for this database
+        removeExistingDatabase(properties, dbId);
 
         // Add or update properties for this database
         String prefix = "db." + dbId;
@@ -62,8 +65,44 @@ public class DatabaseConfigService {
         try (Writer writer = Files.newBufferedWriter(Paths.get(configPath))) {
             properties.store(writer, "Database configurations for controller " + controllerId);
         }
+
+        // Set the ID in the DTO for reference
+        configDTO.setId(dbId);
     }
 
+    private String findExistingDatabaseId(Properties properties, DatabaseConfigDTO newConfig) {
+        Map<String, Map<String, String>> databaseConfigs = new HashMap<>();
+
+        // Group properties by database ID
+        for (String key : properties.stringPropertyNames()) {
+            String[] parts = key.split("\\.");
+            if (parts.length >= 3) {
+                String dbId = parts[1];
+                String propertyName = String.join(".", Arrays.copyOfRange(parts, 2, parts.length));
+                databaseConfigs.computeIfAbsent(dbId, k -> new HashMap<>())
+                        .put(propertyName, properties.getProperty(key));
+            }
+        }
+
+        // Look for matching database
+        for (Map.Entry<String, Map<String, String>> entry : databaseConfigs.entrySet()) {
+            Map<String, String> config = entry.getValue();
+            if (config.get("jdbc.url").equals(newConfig.getJdbcUrl()) &&
+                    config.get("name").equals(newConfig.getDatabaseName())) {
+                return entry.getKey();
+            }
+        }
+
+        return null;
+    }
+
+    private void removeExistingDatabase(Properties properties, String dbId) {
+        String prefix = "db." + dbId + ".";
+        properties.stringPropertyNames().stream()
+                .filter(key -> key.startsWith(prefix))
+                .collect(Collectors.toList()) // Collect to avoid concurrent modification
+                .forEach(properties::remove);
+    }
     private String getJdbcDriver(String dbType) {
         return switch (dbType.toLowerCase()) {
             case "postgresql" -> "org.postgresql.Driver";
@@ -119,6 +158,86 @@ public class DatabaseConfigService {
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
     }
 
+    public List<SchemaMappingDTO> getMappings(Long controllerId) throws IOException {
+        String obdaPath = getObdaPath(controllerId);
+        if (!Files.exists(Paths.get(obdaPath))) {
+            return new ArrayList<>();
+        }
+
+        List<SchemaMappingDTO> mappings = new ArrayList<>();
+        List<String> lines = Files.readAllLines(Paths.get(obdaPath));
+
+        String currentTable = null;
+        String currentColumn = null;
+        String currentClass = null;
+        String currentProperty = null;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+
+            // Skip header sections and empty lines
+            if (line.startsWith("[") || line.isEmpty()) {
+                continue;
+            }
+
+            // Beginning of a new mapping
+            if (line.startsWith("mappingId")) {
+                // Clear previous values
+                currentTable = null;
+                currentColumn = null;
+                currentClass = null;
+                currentProperty = null;
+
+                // Process target line (next line)
+                String targetLine = lines.get(++i).trim();
+                if (targetLine.startsWith("target")) {
+                    // Extract schema class
+                    if (targetLine.contains("schema:")) {
+                        Pattern classPattern = Pattern.compile("a schema:([^ ]+)");
+                        Matcher classMatcher = classPattern.matcher(targetLine);
+                        if (classMatcher.find()) {
+                            currentClass = classMatcher.group(1);
+                        }
+
+                        // Extract schema property
+                        Pattern propertyPattern = Pattern.compile("schema:([^ ]+) \"");
+                        Matcher propertyMatcher = propertyPattern.matcher(targetLine);
+                        if (propertyMatcher.find()) {
+                            currentProperty = propertyMatcher.group(1);
+                        }
+                    }
+                }
+
+                // Process source line (next line)
+                String sourceLine = lines.get(++i).trim();
+                if (sourceLine.startsWith("source")) {
+                    String[] parts = sourceLine.split("FROM");
+                    if (parts.length > 1) {
+                        currentTable = parts[1].trim();
+                        String[] selectParts = parts[0].split("SELECT")[1].trim().split(",");
+                        for (String part : selectParts) {
+                            if (!part.contains("user_id")) { // Skip ID column
+                                currentColumn = part.trim();
+                            }
+                        }
+                    }
+                }
+
+                // If we have all components, create a mapping
+                if (currentTable != null && currentColumn != null &&
+                        currentClass != null && currentProperty != null) {
+                    mappings.add(new SchemaMappingDTO(
+                            currentTable,
+                            currentColumn,
+                            currentClass,
+                            currentProperty
+                    ));
+                }
+            }
+        }
+
+        return mappings;
+    }
     public List<DatabaseConfigDTO> getDatabasesForController(Long controllerId) throws IOException {
         String configPath = getConfigPath(controllerId);
         if (!Files.exists(Paths.get(configPath))) {
@@ -137,7 +256,7 @@ public class DatabaseConfigService {
                 String dbId = parts[1];
                 DatabaseConfigDTO config = configs.computeIfAbsent(dbId, k -> {
                     DatabaseConfigDTO dto = new DatabaseConfigDTO();
-                    dto.setId(k);  // Now just passing the String directly
+                    dto.setId(k);
                     return dto;
                 });
 
@@ -151,6 +270,9 @@ public class DatabaseConfigService {
                             switch (parts[3]) {
                                 case "url" -> config.setJdbcUrl(properties.getProperty(key));
                                 case "user" -> config.setUsername(properties.getProperty(key));
+                                case "password" -> {
+                                    config.setPassword(properties.getProperty(key));
+                                }
                             }
                         }
                     }
@@ -158,7 +280,8 @@ public class DatabaseConfigService {
             }
         }
 
-        return new ArrayList<>(configs.values());
+        List<DatabaseConfigDTO> result = new ArrayList<>(configs.values());
+        return result;
     }
     public List<TableMetadataDTO> getDatabaseTables(DatabaseConfigDTO config) {
         List<TableMetadataDTO> tables = new ArrayList<>();

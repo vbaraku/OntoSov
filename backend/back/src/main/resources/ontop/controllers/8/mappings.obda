@@ -4,8 +4,8 @@ schema: http://schema.org/
 xsd:    http://www.w3.org/2001/XMLSchema#
 
 [MappingDeclaration] @collection [[
-mappingId user_profiles_Person_tax_id_Mapping
-target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:taxID "{tax_id}"^^xsd:string .
-source SELECT user_id, tax_id FROM user_profiles
+mappingId products_Accommodation_name_Mapping
+target :Resource/{product_id} a schema:Accommodation . :Resource/{product_id} schema:floorSize "{name}"^^xsd:string .
+source SELECT product_id, name FROM products
 
 ]]

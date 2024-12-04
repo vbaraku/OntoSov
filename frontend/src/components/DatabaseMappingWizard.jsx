@@ -1,19 +1,41 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Stepper, Step, StepLabel, Button } from "@mui/material";
 import DatabaseConnectionForm from "./DatabaseConnectionForm";
 import SchemaMapper from "./SchemaMapper";
 
 const steps = ["Connect Database", "Map Schema"];
 
-const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
-  const [activeStep, setActiveStep] = useState(0);
-  const [dbConfig, setDbConfig] = useState(null);
+const DatabaseMappingWizard = ({ onComplete, controllerId, database = null }) => {
+  const [activeStep, setActiveStep] = useState(database ? 1 : 0);
+  const [dbConfig, setDbConfig] = useState(database);
   const [tables, setTables] = useState([]);
-  console.log("DatabaseMappingWizard controllerId:", controllerId);  // Add this
-  
+
+  const fetchTables = async (config) => {
+    try {
+      console.log("Fetching tables for config:", config);
+      const tablesResponse = await fetch(
+        "http://localhost:8080/api/database/tables",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(config),
+        }
+      );
+
+      if (!tablesResponse.ok) {
+        throw new Error(`Failed to fetch tables: ${await tablesResponse.text()}`);
+      }
+
+      const tablesData = await tablesResponse.json();
+      setTables(tablesData);
+    } catch (error) {
+      console.error("Error fetching tables:", error);
+    }
+  };
 
   const handleDatabaseConnect = async (config) => {
     try {
+      console.log("Saving database config:", config);
       const saveResponse = await fetch(
         `http://localhost:8080/api/database/save-config?controllerId=${controllerId}`,
         {
@@ -25,28 +47,22 @@ const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
 
       if (!saveResponse.ok) throw new Error("Failed to save database config");
 
-      const tablesResponse = await fetch(
-        "http://localhost:8080/api/database/tables",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(config),
-        }
-      );
-
-      if (!tablesResponse.ok) throw new Error("Failed to fetch tables");
-
-      const tablesData = await tablesResponse.json();
+      // Update the dbConfig state with the saved configuration
       setDbConfig(config);
-      setTables(tablesData);
+      
+      // Fetch tables
+      await fetchTables(config);
+      
+      // Move to next step
       setActiveStep(1);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error saving database:", error);
     }
   };
 
   const handleMappingComplete = () => {
-    onComplete();
+    console.log("Mapping complete");
+    onComplete?.(); // Call onComplete only if it exists
   };
 
   const handleBack = () => {
@@ -56,7 +72,14 @@ const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
   const renderStepContent = (step) => {
     switch (step) {
       case 0:
-        return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} controllerId={controllerId}/>;
+        return (
+          <DatabaseConnectionForm 
+            onSubmit={handleDatabaseConnect} // Only save when form is submitted
+            controllerId={controllerId}
+            initialData={database}
+            isEditMode={!!database}
+          />
+        );
       case 1:
         return (
           <SchemaMapper
@@ -64,6 +87,7 @@ const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
             dbConfig={dbConfig}
             onComplete={handleMappingComplete}
             controllerId={controllerId}
+            isEditMode={!!database}
           />
         );
       default:
@@ -101,7 +125,7 @@ const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
         }}
       >
         {activeStep === 1 && <Button onClick={handleBack}>Back</Button>}
-        <Button onClick={onComplete} color="inherit" sx={{ ml: "auto" }}>
+        <Button onClick={handleMappingComplete} color="inherit" sx={{ ml: "auto" }}>
           Cancel
         </Button>
       </Box>

@@ -24,7 +24,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 
-const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
+const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) => {
   const [mappings, setMappings] = useState([]);
   const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumn, setSelectedColumn] = useState("");
@@ -35,19 +35,42 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
 
+  // Load existing mappings when in edit mode
+  useEffect(() => {
+    if (isEditMode && controllerId) {
+      fetchExistingMappings();
+    }
+  }, [isEditMode, controllerId]);
+
+  const fetchExistingMappings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `http://localhost:8080/api/database/mappings/${controllerId}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch existing mappings");
+      const existingMappings = await response.json();
+      setMappings(existingMappings.map((mapping, index) => ({
+        ...mapping,
+        id: index
+      })));
+    } catch (error) {
+      console.error("Error fetching mappings:", error);
+      setSaveStatus({ type: "error", message: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getColumnsForTable = (tableName) => {
     const table = tables.find((t) => t.name === tableName);
     return table ? table.columns : [];
   };
 
   const searchSchemaClasses = async (query) => {
-    if (!query) return;
     try {
-      setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(
-          query
-        )}`
+        `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(query)}`
       );
       if (!response.ok) throw new Error("Failed to fetch schema classes");
       const data = await response.json();
@@ -55,8 +78,6 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
     } catch (error) {
       console.error("Error:", error);
       setSaveStatus({ type: "error", message: error.message });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -65,9 +86,7 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/schema/properties/${encodeURIComponent(
-          className
-        )}`
+        `http://localhost:8080/api/schema/properties/${encodeURIComponent(className)}`
       );
       if (!response.ok) throw new Error("Failed to fetch schema properties");
       const data = await response.json();
@@ -80,13 +99,14 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
     }
   };
 
+  useEffect(() => {
+    if (selectedSchemaClass) {
+      fetchSchemaProperties(selectedSchemaClass);
+    }
+  }, [selectedSchemaClass]);
+
   const handleAddMapping = () => {
-    if (
-      selectedTable &&
-      selectedColumn &&
-      selectedSchemaClass &&
-      selectedSchemaProperty
-    ) {
+    if (selectedTable && selectedColumn && selectedSchemaClass && selectedSchemaProperty) {
       const newMapping = {
         id: Date.now(),
         databaseTable: selectedTable,
@@ -97,6 +117,7 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
       setMappings([...mappings, newMapping]);
       setSelectedColumn("");
       setSelectedSchemaProperty(null);
+      setSelectedSchemaClass(null);
     }
   };
 
@@ -113,7 +134,6 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
           schemaProperty: m.schemaProperty,
         })),
       };
-      console.log("Mapping request:", mappingRequest);
 
       const response = await fetch(
         `http://localhost:8080/api/database/save-mappings?controllerId=${controllerId}`,
@@ -125,21 +145,20 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
       );
 
       if (!response.ok) throw new Error("Failed to save mappings");
-      setSaveStatus({
-        type: "success",
-        message: "Mappings saved successfully!",
-      });
+      setSaveStatus({ type: "success", message: "Mappings saved successfully!" });
     } catch (error) {
       console.error("Error:", error);
       setSaveStatus({ type: "error", message: error.message });
     }
   };
 
-  useEffect(() => {
-    if (selectedSchemaClass) {
-      fetchSchemaProperties(selectedSchemaClass);
-    }
-  }, [selectedSchemaClass]);
+  if (loading && mappings.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 800, mx: "auto" }}>
@@ -184,28 +203,19 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
             <Autocomplete
               value={selectedSchemaClass}
               onChange={(_, newValue) => setSelectedSchemaClass(newValue)}
-              onInputChange={(_, newInputValue) =>
-                searchSchemaClasses(newInputValue)
-              }
+              onInputChange={(_, newInputValue, reason) => {
+                if (reason === 'input') {
+                  searchSchemaClasses(newInputValue);
+                }
+              }}
               options={schemaClassOptions}
-              loading={loading}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   label="Schema.org Class"
-                  InputProps={{
-                    ...params.InputProps,
-                    endAdornment: (
-                      <>
-                        {loading ? (
-                          <CircularProgress color="inherit" size={20} />
-                        ) : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
                 />
               )}
+              loading={loading}
             />
           </Grid>
 

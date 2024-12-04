@@ -27,30 +27,31 @@ const ControllerPage = () => {
   const [openMapping, setOpenMapping] = useState(false);
   const [selectedDB, setSelectedDB] = useState(null);
   const [databases, setDatabases] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0); // Add refresh key for forcing updates
+
+  const fetchDatabases = async () => {
+    if (!user) return;
+    
+    console.log("Fetching databases...");
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/database/controller/${user.id}/databases`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Received databases:", data);
+        setDatabases(data);
+      } else {
+        console.error("Failed to fetch databases:", await response.text());
+      }
+    } catch (error) {
+      console.error("Error fetching databases:", error);
+    }
+  };
 
   useEffect(() => {
-    if (user) {
-      const fetchDatabases = async () => {
-        try {
-          const response = await fetch(
-            `http://localhost:8080/api/database/controller/${user.id}/databases`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setDatabases(data);
-          }
-        } catch (error) {
-          console.error("Error fetching databases:", error);
-        }
-      };
-
-      fetchDatabases();
-    }
-  }, [user]);
-
-  if (!user) {
-    return <Box>Loading...</Box>;
-  }
+    fetchDatabases();
+  }, [user, refreshKey]);
 
   const handleEditMapping = (db) => {
     setSelectedDB(db);
@@ -67,12 +68,42 @@ const ControllerPage = () => {
       );
       
       if (response.ok) {
-        setDatabases(databases.filter(db => db.id !== dbId));
+        setDatabases(prevDatabases => prevDatabases.filter(db => db.id !== dbId));
       }
     } catch (error) {
       console.error("Error deleting database:", error);
     }
   };
+
+  const handleNewDbComplete = async () => {
+    console.log("New DB completion triggered");
+    try {
+      await fetchDatabases();
+      setOpenNewDB(false);
+      // Force a refresh
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error in new DB completion:", error);
+    }
+  };
+  
+  const handleEditComplete = async () => {
+    console.log("Edit completion triggered");
+    try {
+      await fetchDatabases();
+      setOpenMapping(false);
+      setSelectedDB(null);
+      // Force a refresh
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error("Error in edit completion:", error);
+    }
+  };
+
+
+  if (!user) {
+    return <Box>Loading...</Box>;
+  }
 
   return (
     <Box
@@ -101,7 +132,7 @@ const ControllerPage = () => {
               <CardContent>
                 <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
                   <StorageIcon sx={{ mr: 1 }} />
-                  <Typography variant="h6">{db.name}</Typography>
+                  <Typography variant="h6">{db.databaseName}</Typography>
                 </Box>
                 <Typography color="textSecondary" gutterBottom>
                   {db.jdbcUrl}
@@ -141,7 +172,7 @@ const ControllerPage = () => {
           <DialogTitle>Connect New Database</DialogTitle>
           <DialogContent>
             <DatabaseMappingWizard
-              onComplete={() => setOpenNewDB(false)}
+              onComplete={handleNewDbComplete}
               controllerId={user.id}
             />
           </DialogContent>
@@ -158,7 +189,7 @@ const ControllerPage = () => {
           <DialogTitle>Edit Database Mapping</DialogTitle>
           <DialogContent>
             <DatabaseMappingWizard
-              onComplete={() => setOpenMapping(false)}
+              onComplete={handleEditComplete}
               database={selectedDB}
               controllerId={user.id}
             />

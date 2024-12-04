@@ -19,8 +19,6 @@ public class SchemaOrgController {
             @RequestParam(required = false, defaultValue = "") String query
     ) {
         List<String> results = schemaOrgService.searchClasses(query);
-        System.out.println("Search query: " + query);
-        System.out.println("Results found: " + results.size());
         return ResponseEntity.ok(results);
     }
 
