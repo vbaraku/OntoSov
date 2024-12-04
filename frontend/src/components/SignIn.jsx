@@ -57,13 +57,13 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
   }),
 }));
 
-export default function SignIn(props) {
+export default function SignIn(props) {  
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
   const [passwordError, setPasswordError] = React.useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = React.useState("");
   const [open, setOpen] = React.useState(false);
-  const { setUser } = useContext(AuthContext);
+  const { setUser, login } = useContext(AuthContext);
   const [rememberMe, setRememberMe] = React.useState(false);
   const navigate = useNavigate();
 
@@ -74,45 +74,29 @@ export default function SignIn(props) {
   };
 
   const handleSubmit = async (event) => {
-    event.preventDefault(); // Prevent page reload on form submit
+    event.preventDefault();
 
-    // Validate inputs directly within handleSubmit
     if (!validateInputs()) {
-      return; // Exit if validation fails
+      return;
     }
 
-    const form = event.currentTarget;
-    const email = form.elements.email?.value;
-    const password = form.elements.password?.value;
-
-    console.log("Submitting login with:", { email, password, rememberMe });
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
 
     try {
-      console.log("Sending login request to server...");
-      const response = await axios.post("http://localhost:8080/auth/login", {
-        email,
-        password,
-      });
-      console.log("Request sent");
+      const user = await login(email, password);  // Using AuthContext login
 
-      if (response.status === 200) {
-        const user = response.data;
-        setUser(user);
-
-        if (rememberMe) {
-          localStorage.setItem("user", JSON.stringify(user));
-        } else {
-          sessionStorage.setItem("user", JSON.stringify(user));
-        }
-
-        navigate(user.role === "SUBJECT" ? "/subject" : "/controller");
+      if (rememberMe) {
+        localStorage.setItem("user", JSON.stringify(user));
       } else {
-        console.log("Invalid credentials");
+        sessionStorage.setItem("user", JSON.stringify(user));
       }
+
+      navigate(user.role === "SUBJECT" ? "/subject" : "/controller");
     } catch (error) {
       console.error("Error during login:", error);
     }
-  };
+};
 
   const validateInputs = () => {
     const email = document.getElementById("email");

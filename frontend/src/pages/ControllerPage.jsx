@@ -17,31 +17,61 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import StorageIcon from "@mui/icons-material/Storage";
 import DatabaseConnectionForm from "../components/DatabaseConnectionForm";
 import DatabaseMappingWizard from "../components/DatabaseMappingWizard";
+import { useContext, useEffect } from "react";
+import { AuthContext } from "../components/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const ControllerPage = () => {
+  const { user } = useContext(AuthContext);
   const [openNewDB, setOpenNewDB] = useState(false);
   const [openMapping, setOpenMapping] = useState(false);
   const [selectedDB, setSelectedDB] = useState(null);
+  const [databases, setDatabases] = useState([]);
 
-  // Replace with API call later
-  const [databases] = useState([
-    {
-      id: 1,
-      name: "Customer Database",
-      url: "jdbc:postgresql://localhost:5432/customers",
-      mappings: ["Person", "Organization"],
-    },
-    {
-      id: 2,
-      name: "Product Database",
-      url: "jdbc:postgresql://localhost:5432/products",
-      mappings: ["Product", "Offer"],
-    },
-  ]);
+  useEffect(() => {
+    if (user) {
+      const fetchDatabases = async () => {
+        try {
+          const response = await fetch(
+            `http://localhost:8080/api/database/controller/${user.id}/databases`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setDatabases(data);
+          }
+        } catch (error) {
+          console.error("Error fetching databases:", error);
+        }
+      };
+
+      fetchDatabases();
+    }
+  }, [user]);
+
+  if (!user) {
+    return <Box>Loading...</Box>;
+  }
 
   const handleEditMapping = (db) => {
     setSelectedDB(db);
     setOpenMapping(true);
+  };
+
+  const handleDeleteDatabase = async (dbId) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/database/controller/${user.id}/databases/${dbId}`,
+        {
+          method: 'DELETE'
+        }
+      );
+      
+      if (response.ok) {
+        setDatabases(databases.filter(db => db.id !== dbId));
+      }
+    } catch (error) {
+      console.error("Error deleting database:", error);
+    }
   };
 
   return (
@@ -74,10 +104,10 @@ const ControllerPage = () => {
                   <Typography variant="h6">{db.name}</Typography>
                 </Box>
                 <Typography color="textSecondary" gutterBottom>
-                  {db.url}
+                  {db.jdbcUrl}
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  Mapped Schema.org Classes: {db.mappings.join(", ")}
+                  Type: {db.databaseType}
                 </Typography>
                 <Box
                   sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}
@@ -88,7 +118,10 @@ const ControllerPage = () => {
                   >
                     <EditIcon />
                   </IconButton>
-                  <IconButton color="error">
+                  <IconButton 
+                    color="error"
+                    onClick={() => handleDeleteDatabase(db.id)}
+                  >
                     <DeleteIcon />
                   </IconButton>
                 </Box>
@@ -98,28 +131,40 @@ const ControllerPage = () => {
         ))}
       </Grid>
 
-      <Dialog
-        open={openNewDB}
-        onClose={() => setOpenNewDB(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>Connect New Database</DialogTitle>
-        <DatabaseMappingWizard onComplete={() => setOpenNewDB(false)} />
-      </Dialog>
+      {openNewDB && (
+        <Dialog
+          open={openNewDB}
+          onClose={() => setOpenNewDB(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>Connect New Database</DialogTitle>
+          <DialogContent>
+            <DatabaseMappingWizard
+              onComplete={() => setOpenNewDB(false)}
+              controllerId={user.id}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
-      <Dialog
-        open={openMapping}
-        onClose={() => setOpenMapping(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>Edit Database Mapping</DialogTitle>
-        <DatabaseMappingWizard
-          onComplete={() => setOpenMapping(false)}
-          database={selectedDB}
-        />
-      </Dialog>
+      {openMapping && (
+        <Dialog
+          open={openMapping}
+          onClose={() => setOpenMapping(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>Edit Database Mapping</DialogTitle>
+          <DialogContent>
+            <DatabaseMappingWizard
+              onComplete={() => setOpenMapping(false)}
+              database={selectedDB}
+              controllerId={user.id}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </Box>
   );
 };

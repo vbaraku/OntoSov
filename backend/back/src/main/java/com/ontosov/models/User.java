@@ -1,5 +1,6 @@
 package com.ontosov.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 @Entity
 @Table(name = "users")
@@ -9,9 +10,6 @@ public class User {
     private Long id;
 
     @Column(unique = true)
-    private String taxid;
-
-    @Column(unique = true, nullable = false)
     private String email;
 
     @Column(nullable = false)
@@ -20,6 +18,15 @@ public class User {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRole role;
+
+    @Column(unique = true)
+    private String taxid;  // For subjects
+
+    @Column
+    private String name;   // For controllers
+
+    @JsonIgnore  // Don't send password in response
+    private String password;
 
     public UserRole getRole() {
         return role;
@@ -36,12 +43,6 @@ public class User {
     public void setName(String name) {
         this.name = name;
     }
-
-    @Column
-    private String name;  // For controllers
-
-    @Transient
-    private String password;
 
     // Getters and setters
     public Long getId() {

@@ -14,14 +14,21 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    @PostMapping("/signup")
-    public User signup(@RequestBody SignupRequestDTO request) {
-        String taxidOrName = request.getRole() == UserRole.SUBJECT ? request.getTaxid() : request.getName();
-        return authService.registerUser(request.getEmail(), request.getPassword(), request.getRole(), taxidOrName);
-    }
-
     @PostMapping("/login")
     public User login(@RequestBody LoginRequestDTO request) {
         return authService.authenticateUser(request.getEmail(), request.getPassword());
+        // Will return full User object (minus password/hash)
+    }
+
+    @PostMapping("/signup")
+    public User signup(@RequestBody SignupRequestDTO request) {
+        String taxidOrName = request.getRole() == UserRole.SUBJECT ?
+                request.getTaxid() : request.getName();
+        return authService.registerUser(
+                request.getEmail(),
+                request.getPassword(),
+                request.getRole(),
+                taxidOrName
+        );
     }
 }

@@ -28,16 +28,31 @@ public class DatabaseConfigController {
     }
 
     @PostMapping("/save-config")
-    public ResponseEntity<?> saveDatabaseConfiguration(@RequestBody DatabaseConfigDTO configDTO) throws IOException {
-        databaseConfigService.saveDatabaseConfiguration(configDTO);
+    public ResponseEntity<?> saveDatabaseConfiguration(
+            @RequestBody DatabaseConfigDTO configDTO,
+            @RequestParam Long controllerId) throws IOException {
+        databaseConfigService.saveDatabaseConfiguration(configDTO, controllerId);
         return ResponseEntity.ok().body("Database configuration saved");
     }
 
     @PostMapping("/save-mappings")
-    public ResponseEntity<Void> saveMappings(@RequestBody MappingRequestDTO request) {
+    public ResponseEntity<Void> saveMappings(
+            @RequestBody MappingRequestDTO request,
+            @RequestParam Long controllerId) {
         try {
-            databaseConfigService.saveSchemaMappings(request);
+            databaseConfigService.saveSchemaMappings(request, controllerId);
             return ResponseEntity.ok().build();
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/controller/{controllerId}/databases")
+    public ResponseEntity<List<DatabaseConfigDTO>> getDatabasesForController(
+            @PathVariable Long controllerId) {
+        try {
+            List<DatabaseConfigDTO> databases = databaseConfigService.getDatabasesForController(controllerId);
+            return ResponseEntity.ok(databases);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -47,5 +62,17 @@ public class DatabaseConfigController {
     public ResponseEntity<?> getDatabaseTables(@RequestBody DatabaseConfigDTO config) {
         List<TableMetadataDTO> tables = databaseConfigService.getDatabaseTables(config);
         return ResponseEntity.ok().body(tables);
+    }
+
+    @DeleteMapping("/controller/{controllerId}/databases/{dbId}")
+    public ResponseEntity<Void> deleteDatabaseConfig(
+            @PathVariable Long controllerId,
+            @PathVariable String dbId) {
+        try {
+            databaseConfigService.deleteDatabaseConfig(dbId, controllerId);
+            return ResponseEntity.ok().build();
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

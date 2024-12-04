@@ -73,20 +73,20 @@ public class DataSourceConfig {
     }
 
     // MongoDB configuration
-    @Value("${spring.data.mongodb.uri}")
-    private String mongoUri;
-
-
-
-    @Bean
-    public MongoClient mongoClient() {
-        return MongoClients.create(mongoUri);
-    }
-
-    @Bean
-    public MongoTemplate mongoTemplate() {
-        return new MongoTemplate(mongoClient(), "controller2db");
-    }
+//    @Value("${spring.data.mongodb.uri}")
+//    private String mongoUri;
+//
+//
+//
+//    @Bean
+//    public MongoClient mongoClient() {
+//        return MongoClients.create(mongoUri);
+//    }
+//
+//    @Bean
+//    public MongoTemplate mongoTemplate() {
+//        return new MongoTemplate(mongoClient(), "controller2db");
+//    }
 }
 
 

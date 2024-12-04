@@ -1,23 +1,24 @@
-import React, { useContext, useRef } from "react";
+import React, { useContext, useRef, useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { AuthContext } from "./AuthContext";
 
 const ProtectedRoute = () => {
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
 
-  // If the user is not logged in, redirect to the authentication page
-  console.log("protected route");
-  console.log(sessionStorage.getItem("user"));
+  
+  useEffect(() => {
+    // Check localStorage/sessionStorage on mount
+    const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+    if (storedUser && !user) {
+      console.log("here")
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
-  if (
-    !user &&
-    !localStorage.getItem("user") &&
-    !sessionStorage.getItem("user")
-  ) {
+  if (!user) {
     return <Navigate to="/signin" replace />;
   }
 
-  // If the user is logged in, render the child components
   return <Outlet />;
 };
 

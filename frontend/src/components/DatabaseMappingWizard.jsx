@@ -5,15 +5,17 @@ import SchemaMapper from "./SchemaMapper";
 
 const steps = ["Connect Database", "Map Schema"];
 
-const DatabaseMappingWizard = ({ onComplete }) => {
+const DatabaseMappingWizard = ({ onComplete, controllerId }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [dbConfig, setDbConfig] = useState(null);
   const [tables, setTables] = useState([]);
+  console.log("DatabaseMappingWizard controllerId:", controllerId);  // Add this
+  
 
   const handleDatabaseConnect = async (config) => {
     try {
       const saveResponse = await fetch(
-        "http://localhost:8080/api/database/save-config",
+        `http://localhost:8080/api/database/save-config?controllerId=${controllerId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -54,13 +56,14 @@ const DatabaseMappingWizard = ({ onComplete }) => {
   const renderStepContent = (step) => {
     switch (step) {
       case 0:
-        return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} />;
+        return <DatabaseConnectionForm onSubmit={handleDatabaseConnect} controllerId={controllerId}/>;
       case 1:
         return (
           <SchemaMapper
             tables={tables}
             dbConfig={dbConfig}
             onComplete={handleMappingComplete}
+            controllerId={controllerId}
           />
         );
       default:

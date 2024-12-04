@@ -24,7 +24,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 
-const SchemaMapper = ({ tables, dbConfig }) => {
+const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
   const [mappings, setMappings] = useState([]);
   const [selectedTable, setSelectedTable] = useState("");
   const [selectedColumn, setSelectedColumn] = useState("");
@@ -116,7 +116,7 @@ const SchemaMapper = ({ tables, dbConfig }) => {
       console.log("Mapping request:", mappingRequest);
 
       const response = await fetch(
-        "http://localhost:8080/api/database/save-mappings",
+        `http://localhost:8080/api/database/save-mappings?controllerId=${controllerId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

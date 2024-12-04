@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 
-const DatabaseConnectionForm = ({ onSubmit }) => {
+const DatabaseConnectionForm = ({ onSubmit, controllerId }) => {  // Add controllerId prop
   const [formData, setFormData] = useState({
     databaseType: "",
     host: "",
@@ -92,13 +92,36 @@ const DatabaseConnectionForm = ({ onSubmit }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const config = {
       ...formData,
       jdbcUrl: getJdbcUrl(),
     };
-    onSubmit(config);
+
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/database/save-config?controllerId=${controllerId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(config),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to save database configuration");
+      }
+
+      onSubmit(config);
+    } catch (error) {
+      setTestStatus({
+        type: "error",
+        message: `Failed to save configuration: ${error.message}`,
+      });
+    }
   };
 
   return (

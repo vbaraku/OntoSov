@@ -17,13 +17,13 @@ public class HomeController {
         this.databaseTestService = databaseTestService;
     }
 
-    @GetMapping("/postgres")
-    public String testPostgres() {
-        return databaseTestService.testPostgresConnection() ? "Postgres connected successfully" : "Postgres connection failed";
-    }
+//    @GetMapping("/postgres")
+//    public String testPostgres() {
+//        return databaseTestService.testPostgresConnection() ? "Postgres connected successfully" : "Postgres connection failed";
+//    }
 
-    @GetMapping("/mongo")
-    public String testMongo() {
-        return databaseTestService.testMongoConnection() ? "MongoDB connected successfully" : "MongoDB connection failed";
-    }
+//    @GetMapping("/mongo")
+//    public String testMongo() {
+//        return databaseTestService.testMongoConnection() ? "MongoDB connected successfully" : "MongoDB connection failed";
+//    }
 }
