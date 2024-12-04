@@ -10,13 +10,19 @@ const ProtectedRoute = () => {
     // Check localStorage/sessionStorage on mount
     const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
     if (storedUser && !user) {
-      console.log("here")
       setUser(JSON.parse(storedUser));
     }
-  }, []);
+  }, [setUser, user]);
 
   if (!user) {
-    return <Navigate to="/signin" replace />;
+    // Check if user data is available in local/session storage
+    const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+      return <Outlet />;
+    } else {
+      return <Navigate to="/signin" replace />;
+    }
   }
 
   return <Outlet />;
