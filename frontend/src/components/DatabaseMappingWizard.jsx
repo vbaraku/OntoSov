@@ -10,6 +10,12 @@ const DatabaseMappingWizard = ({ onComplete, controllerId, database = null }) =>
   const [dbConfig, setDbConfig] = useState(database);
   const [tables, setTables] = useState([]);
 
+  useEffect(() => {
+    if (database) {
+      fetchTables(database);
+    }
+  }, [database]);
+
   const fetchTables = async (config) => {
     try {
       console.log("Fetching tables for config:", config);

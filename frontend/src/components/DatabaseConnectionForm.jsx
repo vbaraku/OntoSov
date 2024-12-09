@@ -75,38 +75,40 @@ const DatabaseConnectionForm = ({ onSubmit, controllerId, initialData = null, is
 
   const handleTestConnection = async () => {
     try {
-      setTestStatus({ type: "info", message: "Testing connection..." });
+        setTestStatus({ type: "info", message: "Testing connection..." });
 
-      const configToTest = {
-        ...formData,
-        jdbcUrl: getJdbcUrl(),
-        // In edit mode, use existing password if no new one is provided
-        password: formData.password || (initialData?.password || '')
-      };
+        const configToTest = {
+            ...formData,
+            jdbcUrl: getJdbcUrl(),
+        };
+        
+        console.log("Testing connection with config:", configToTest);  
 
-      const response = await fetch(
-        "http://localhost:8080/api/database/connect",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(configToTest),
+        const response = await fetch(
+            "http://localhost:8080/api/database/connect",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(configToTest),
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();  
+            console.error("Connection test failed:", errorText);  
+            throw new Error(`Connection test failed: ${errorText}`);
         }
-      );
 
-      if (!response.ok) {
-        throw new Error("Connection test failed");
-      }
-
-      setTestStatus({ type: "success", message: "Connection successful!" });
+        setTestStatus({ type: "success", message: "Connection successful!" });
     } catch (error) {
-      setTestStatus({
-        type: "error",
-        message: `Connection failed: ${error.message}`,
-      });
+        setTestStatus({
+            type: "error",
+            message: `Connection failed: ${error.message}`,
+        });
     }
-  };
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();

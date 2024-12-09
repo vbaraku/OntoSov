@@ -46,7 +46,7 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8080/api/database/mappings/${controllerId}`
+        `http://localhost:8080/api/database/mappings/${controllerId}/${dbConfig.databaseName}`
       );
       if (!response.ok) throw new Error("Failed to fetch existing mappings");
       const existingMappings = await response.json();

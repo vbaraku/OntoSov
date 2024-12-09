@@ -47,10 +47,12 @@ public class DatabaseConfigController {
         }
     }
 
-    @GetMapping("/mappings/{controllerId}")
-    public ResponseEntity<List<SchemaMappingDTO>> getMappings(@PathVariable Long controllerId) {
+    @GetMapping("/mappings/{controllerId}/{databaseName}")
+    public ResponseEntity<List<SchemaMappingDTO>> getMappings(
+            @PathVariable Long controllerId,
+            @PathVariable String databaseName) {
         try {
-            List<SchemaMappingDTO> mappings = databaseConfigService.getMappings(controllerId);
+            List<SchemaMappingDTO> mappings = databaseConfigService.getMappings(controllerId, databaseName);
             return ResponseEntity.ok(mappings);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().build();

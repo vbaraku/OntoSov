@@ -26,8 +26,8 @@ public class DatabaseConfigService {
         return getControllerDir(controllerId) + "database_configs.properties";
     }
 
-    private String getObdaPath(Long controllerId) {
-        return getControllerDir(controllerId) + "mappings.obda";
+    private String getObdaPath(Long controllerId, String databaseName) {
+        return getControllerDir(controllerId) + "/db_" + databaseName + "_mappings.obda";
     }
 
     public void saveDatabaseConfiguration(DatabaseConfigDTO configDTO, Long controllerId) throws IOException {
@@ -114,6 +114,9 @@ public class DatabaseConfigService {
     }
 
     public void saveSchemaMappings(MappingRequestDTO request, Long controllerId) throws IOException {
+        // Get database ID from the request
+        String databaseName = request.databaseConfig().getDatabaseName();
+
         StringBuilder obdaContent = new StringBuilder();
 
         // Header
@@ -153,13 +156,14 @@ public class DatabaseConfigService {
 
         obdaContent.append("]]");
 
-        // Save OBDA file
-        String obdaPath = getObdaPath(controllerId);
+        // Save OBDA file with database-specific path
+        String obdaPath = getObdaPath(controllerId, databaseName);
+        Files.createDirectories(Paths.get(obdaPath).getParent());
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
     }
 
-    public List<SchemaMappingDTO> getMappings(Long controllerId) throws IOException {
-        String obdaPath = getObdaPath(controllerId);
+    public List<SchemaMappingDTO> getMappings(Long controllerId, String dbId) throws IOException {
+        String obdaPath = getObdaPath(controllerId, dbId);
         if (!Files.exists(Paths.get(obdaPath))) {
             return new ArrayList<>();
         }
@@ -345,13 +349,20 @@ public class DatabaseConfigService {
     }
 
     public boolean testDatabaseConnection(DatabaseConfigDTO config) {
-        try (Connection connection = DriverManager.getConnection(
-                config.getJdbcUrl(),
-                config.getUsername(),
-                config.getPassword()
-        )) {
+        try {
+            System.out.println("Testing connection with URL: " + config.getJdbcUrl());
+            System.out.println("Username: " + config.getUsername());
+            Class.forName(getJdbcDriver(config.getDatabaseType())); // Add this line to ensure driver is loaded
+            Connection connection = DriverManager.getConnection(
+                    config.getJdbcUrl(),
+                    config.getUsername(),
+                    config.getPassword()
+            );
+            connection.close();
             return true;
         } catch (Exception e) {
+            System.err.println("Connection test failed: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
