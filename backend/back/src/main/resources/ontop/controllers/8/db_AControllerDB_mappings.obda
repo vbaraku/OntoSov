@@ -8,8 +8,20 @@ mappingId user_profiles_Person_tax_id_Mapping
 target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:taxID "{tax_id}"^^xsd:string .
 source SELECT user_id, tax_id FROM user_profiles
 
+mappingId user_profiles_Person_name_Mapping
+target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:givenName "{name}"^^xsd:string .
+source SELECT user_id, name FROM user_profiles
+
+mappingId user_profiles_Person_phone_number_Mapping
+target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:telephone "{phone_number}"^^xsd:string .
+source SELECT user_id, phone_number FROM user_profiles
+
 mappingId user_profiles_Person_email_Mapping
 target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:email "{email}"^^xsd:string .
 source SELECT user_id, email FROM user_profiles
+
+mappingId user_profiles_Person_address_Mapping
+target :Resource/{user_id} a schema:Person . :Resource/{user_id} schema:address "{address}"^^xsd:string .
+source SELECT user_id, address FROM user_profiles
 
 ]]
