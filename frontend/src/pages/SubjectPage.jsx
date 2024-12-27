@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../components/AuthContext';
 import {
   Box,
@@ -18,47 +18,62 @@ import {
   IconButton,
   Tooltip,
   Stack,
-  Chip
+  Chip,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { ExpandMore, Lock } from '@mui/icons-material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import StorageIcon from '@mui/icons-material/Storage';
 
 const SubjectPage = () => {
-  const mockData = {
-    'Amazon Corp': {
-      databases: {
-        'Customer Database': {
-          'Customer Profiles': [
-            { field: 'Name', value: 'John Doe' },
-            { field: 'Email', value: 'john@email.com' },
-            { field: 'Phone', value: '+1234567890' }
-          ],
-          'Purchase History': [
-            { field: 'Order ID', value: '#12345' },
-            { field: 'Date', value: '2024-01-15' },
-            { field: 'Total', value: '$299.99' }
-          ]
+  const { user } = useContext(AuthContext);
+  const [data, setData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  console.log(user);
+  console.log("here");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.taxid) return;
+      
+      try {
+        const response = await fetch(
+          `http://localhost:8080/api/ontop/person/${user.taxid}/controller/8`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
         }
+        
+        const result = await response.json();
+        setData(result);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    },
-    'General Hospital': {
-      databases: {
-        'Patient Records': {
-          'Patient Information': [
-            { field: 'Patient ID', value: 'P789' },
-            { field: 'Blood Type', value: 'O+' },
-            { field: 'Allergies', value: 'Penicillin' }
-          ],
-          'Medical Records': [
-            { field: 'Visit Date', value: '2024-02-01' },
-            { field: 'Diagnosis', value: 'Regular Checkup' },
-            { field: 'Medication', value: 'None' }
-          ]
-        }
-      }
-    }
-  };
+    };
+
+    fetchData();
+  }, [user]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">Error loading data: {error}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{
@@ -73,14 +88,14 @@ const SubjectPage = () => {
           My Personal Data Overview
         </Typography>
         
-        {Object.entries(mockData).map(([controller, data]) => (
-          <Accordion key={controller} defaultExpanded sx={{ mb: 2 }}>
+        {Object.entries(data).map(([source, properties]) => (
+          <Accordion key={source} defaultExpanded sx={{ mb: 2 }}>
             <AccordionSummary expandIcon={<ExpandMore />}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <AccountBalanceIcon color="primary" />
-                <Typography variant="h6">{controller}</Typography>
+                <Typography variant="h6">{source}</Typography>
                 <Chip 
-                  label="Controller"
+                  label="Data Source"
                   size="small"
                   color="primary"
                   variant="outlined"
@@ -88,56 +103,36 @@ const SubjectPage = () => {
               </Stack>
             </AccordionSummary>
             <AccordionDetails>
-              {Object.entries(data.databases).map(([dbName, tables]) => (
-                <Card key={dbName} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-                      <StorageIcon color="primary" />
-                      <Typography variant="h6">{dbName}</Typography>
-                      <Chip 
-                        label="Database"
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                      />
-                    </Stack>
-                    
-                    {Object.entries(tables).map(([tableName, fields]) => (
-                      <Box key={tableName} sx={{ mb: 2 }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                          {tableName}
-                        </Typography>
-                        <TableContainer component={Paper}>
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell width="200px">Field</TableCell>
-                                <TableCell>Value</TableCell>
-                                <TableCell align="right" width="100px">Access Policy</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {fields.map((field, index) => (
-                                <TableRow key={index}>
-                                  <TableCell>{field.field}</TableCell>
-                                  <TableCell>{field.value}</TableCell>
-                                  <TableCell align="right">
-                                    <Tooltip title="Configure Access Policy">
-                                      <IconButton size="small">
-                                        <Lock />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </Box>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
+              <Card>
+                <CardContent>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell width="200px">Property</TableCell>
+                          <TableCell>Value</TableCell>
+                          <TableCell align="right" width="100px">Access Policy</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {Object.entries(properties).map(([property, value]) => (
+                          <TableRow key={property}>
+                            <TableCell>{property}</TableCell>
+                            <TableCell>{value}</TableCell>
+                            <TableCell align="right">
+                              <Tooltip title="Configure Access Policy">
+                                <IconButton size="small">
+                                  <Lock />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
             </AccordionDetails>
           </Accordion>
         ))}

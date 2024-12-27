@@ -5,7 +5,6 @@ import it.unibz.inf.ontop.rdf4j.repository.OntopRepository;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,80 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 @Service
 public class OntopService {
     private static final Logger log = LoggerFactory.getLogger(OntopService.class);
     private static final String ONTOP_DIR = "src/main/resources/ontop/controllers/";
-
-    public List<Map<String, String>> executeQuery(Long controllerId, String taxId, String sparqlQuery) {
-        List<Map<String, String>> results = new ArrayList<>();
-
-        try {
-            // Load configurations
-            Properties properties = loadDatabaseProperties(controllerId);
-            Map<String, DatabaseConfig> dbConfigs = parseDatabaseConfigs(properties);
-
-            // Find the database we want to query
-            String obdaFileName = "db_AControllerDB_mappings.obda";
-            String dbName = "AControllerDB"; // For now hardcoded, should be extracted from OBDA filename
-            DatabaseConfig dbConfig = dbConfigs.values().stream()
-                    .filter(config -> dbName.equals(config.name))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Database config not found for: " + dbName));
-
-            log.info("Using database configuration:");
-            log.info("Name: {}", dbConfig.name);
-            log.info("JDBC URL: {}", dbConfig.jdbcUrl);
-            log.info("Username: {}", dbConfig.username);
-
-            // Load OBDA file
-            Path obdaPath = Paths.get(ONTOP_DIR, controllerId.toString(), obdaFileName);
-            if (!Files.exists(obdaPath)) {
-                throw new RuntimeException("OBDA file not found: " + obdaPath);
-            }
-
-            String mappingPath = obdaPath.toUri().toString();
-            log.info("Using mapping file: {}", mappingPath);
-
-            // Configure Ontop
-            OntopSQLOWLAPIConfiguration config = OntopSQLOWLAPIConfiguration.defaultBuilder()
-                    .nativeOntopMappingFile(mappingPath)
-                    .jdbcUrl(dbConfig.jdbcUrl)
-                    .jdbcUser(dbConfig.username)
-                    .jdbcPassword(dbConfig.password)
-                    .enableTestMode()
-                    .build();
-
-            // Create repository and execute query
-            OntopRepository repository = OntopRepository.defaultRepository(config);
-
-            // Replace parameter in query
-            sparqlQuery = sparqlQuery.replace("?taxIdParam", "\"" + taxId + "\"");
-            log.info("Executing SPARQL query: {}", sparqlQuery);
-
-            try (RepositoryConnection conn = repository.getConnection()) {
-                TupleQuery query = conn.prepareTupleQuery(sparqlQuery);
-
-                try (TupleQueryResult rs = query.evaluate()) {
-                    while (rs.hasNext()) {
-                        var bindingSet = rs.next();
-                        Map<String, String> resultRow = new HashMap<>();
-                        resultRow.put("property", bindingSet.getValue("property").stringValue());
-                        resultRow.put("value", bindingSet.getValue("value").stringValue());
-                        results.add(resultRow);
-                    }
-                }
-            } finally {
-                repository.shutDown();
-            }
-        } catch (Exception e) {
-            log.error("Error executing SPARQL query", e);
-            throw new RuntimeException("Error executing SPARQL query", e);
-        }
-
-        return results;
-    }
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     private Properties loadDatabaseProperties(Long controllerId) {
         Properties properties = new Properties();
@@ -107,7 +40,6 @@ public class OntopService {
     private Map<String, DatabaseConfig> parseDatabaseConfigs(Properties properties) {
         Map<String, DatabaseConfig> configs = new HashMap<>();
 
-        // First, identify all database IDs
         Set<String> databaseIds = new HashSet<>();
         properties.stringPropertyNames().forEach(key -> {
             String[] parts = key.split("\\.");
@@ -116,17 +48,13 @@ public class OntopService {
             }
         });
 
-        // Then process each database
         for (String dbId : databaseIds) {
             DatabaseConfig config = new DatabaseConfig();
             String prefix = "db." + dbId + ".";
 
-            // Basic properties
             config.name = properties.getProperty(prefix + "name");
             config.type = properties.getProperty(prefix + "type");
-
-            // JDBC properties
-            config.jdbcUrl = properties.getProperty(prefix + "jdbc.url").replace("\\:", ":");  // Unescape colons
+            config.jdbcUrl = properties.getProperty(prefix + "jdbc.url").replace("\\:", ":");
             config.username = properties.getProperty(prefix + "jdbc.user");
             config.password = properties.getProperty(prefix + "jdbc.password");
 
@@ -139,6 +67,108 @@ public class OntopService {
         return configs;
     }
 
+    public List<Map<String, String>> executeQuery(Long controllerId, String taxId, String sparqlQuery) {
+        try {
+            Properties properties = loadDatabaseProperties(controllerId);
+            Map<String, DatabaseConfig> dbConfigs = parseDatabaseConfigs(properties);
+
+            Path controllerDir = Paths.get(ONTOP_DIR, controllerId.toString());
+            List<Path> obdaFiles = Files.list(controllerDir)
+                    .filter(path -> path.toString().endsWith(".obda"))
+                    .collect(Collectors.toList());
+
+            List<Future<List<Map<String, String>>>> futures = new ArrayList<>();
+
+            for (Path obdaPath : obdaFiles) {
+                String dbName = extractDatabaseName(obdaPath);
+                DatabaseConfig dbConfig = findDatabaseConfig(dbConfigs, dbName);
+
+                if (dbConfig != null) {
+                    futures.add(executorService.submit(() ->
+                            queryDatabase(dbConfig, obdaPath, sparqlQuery, taxId)));
+                }
+            }
+
+            List<Map<String, String>> mergedResults = new ArrayList<>();
+            Set<String> seenValues = new HashSet<>();
+
+            for (Future<List<Map<String, String>>> future : futures) {
+                try {
+                    List<Map<String, String>> dbResults = future.get(30, TimeUnit.SECONDS);
+                    for (Map<String, String> result : dbResults) {
+                        String uniqueKey = result.get("property") + "|" + result.get("value");
+                        if (!seenValues.contains(uniqueKey)) {
+                            seenValues.add(uniqueKey);
+                            mergedResults.add(result);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Error executing query on database", e);
+                }
+            }
+
+            return mergedResults;
+
+        } catch (Exception e) {
+            log.error("Error executing federated query", e);
+            throw new RuntimeException("Error executing federated query", e);
+        }
+    }
+
+    private List<Map<String, String>> queryDatabase(
+            DatabaseConfig config,
+            Path obdaPath,
+            String sparqlQuery,
+            String taxId) {
+
+        List<Map<String, String>> results = new ArrayList<>();
+        String mappingPath = obdaPath.toUri().toString();
+
+        try {
+            OntopSQLOWLAPIConfiguration ontopConfig = OntopSQLOWLAPIConfiguration.defaultBuilder()
+                    .nativeOntopMappingFile(mappingPath)
+                    .jdbcUrl(config.jdbcUrl)
+                    .jdbcUser(config.username)
+                    .jdbcPassword(config.password)
+                    .enableTestMode()
+                    .build();
+
+            try (OntopRepository repository = OntopRepository.defaultRepository(ontopConfig);
+                 RepositoryConnection conn = repository.getConnection()) {
+
+                String parameterizedQuery = sparqlQuery.replace("?taxIdParam", "\"" + taxId + "\"");
+                TupleQuery query = conn.prepareTupleQuery(parameterizedQuery);
+
+                try (TupleQueryResult rs = query.evaluate()) {
+                    while (rs.hasNext()) {
+                        var bindingSet = rs.next();
+                        Map<String, String> resultRow = new HashMap<>();
+                        resultRow.put("property", bindingSet.getValue("property").stringValue());
+                        resultRow.put("value", bindingSet.getValue("value").stringValue());
+                        resultRow.put("source", config.name);
+                        results.add(resultRow);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error querying database: {}", config.name, e);
+        }
+
+        return results;
+    }
+
+    private String extractDatabaseName(Path obdaPath) {
+        String filename = obdaPath.getFileName().toString();
+        return filename.substring(filename.indexOf("_") + 1, filename.lastIndexOf("_"));
+    }
+
+    private DatabaseConfig findDatabaseConfig(Map<String, DatabaseConfig> configs, String dbName) {
+        return configs.values().stream()
+                .filter(config -> config.name.equalsIgnoreCase(dbName))
+                .findFirst()
+                .orElse(null);
+    }
+
     public String getPersonDataQuery() {
         return """
             PREFIX schema: <http://schema.org/>
@@ -149,8 +179,10 @@ public class OntopService {
             WHERE {
                 ?person a schema:Person ;
                         schema:taxID ?taxId .
+                FILTER(?taxId = ?taxIdParam)
                 ?person ?property ?value .
-                FILTER (?property != rdf:type && ?taxId = ?taxIdParam)
+                FILTER(?property != rdf:type && 
+                       ?property != schema:taxID)
             }
             """;
     }

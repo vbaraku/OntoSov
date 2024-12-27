@@ -5,8 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/ontop")
@@ -16,15 +16,33 @@ public class OntopController {
     private OntopService ontopService;
 
     @GetMapping("/person/{taxId}/controller/{controllerId}")
-    public ResponseEntity<List<Map<String, String>>> getPersonData(
+    public ResponseEntity<Map<String, Map<String, Object>>> getPersonData(
             @PathVariable String taxId,
             @PathVariable Long controllerId) {
         try {
             String query = ontopService.getPersonDataQuery();
             List<Map<String, String>> results = ontopService.executeQuery(controllerId, taxId, query);
-            return ResponseEntity.ok(results);
+
+            Map<String, Map<String, Object>> formattedResults = results.stream()
+                    .collect(Collectors.groupingBy(
+                            m -> m.get("source"),
+                            Collectors.collectingAndThen(
+                                    Collectors.toList(),
+                                    list -> {
+                                        Map<String, Object> properties = new HashMap<>();
+                                        list.forEach(item -> {
+                                            String propertyName = item.get("property")
+                                                    .replace("http://schema.org/", "");
+                                            properties.put(propertyName, item.get("value"));
+                                        });
+                                        return properties;
+                                    }
+                            )
+                    ));
+
+            return ResponseEntity.ok(formattedResults);
         } catch (Exception e) {
-            e.printStackTrace(); // for debugging
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
