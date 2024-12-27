@@ -143,13 +143,14 @@ public class OntopService {
         return """
             PREFIX schema: <http://schema.org/>
             PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
-            SELECT DISTINCT ?property ?value
+            SELECT ?property ?value
             WHERE {
                 ?person a schema:Person ;
                         schema:taxID ?taxId .
                 ?person ?property ?value .
-                FILTER (?taxId = ?taxIdParam)
+                FILTER (?property != rdf:type && ?taxId = ?taxIdParam)
             }
             """;
     }
