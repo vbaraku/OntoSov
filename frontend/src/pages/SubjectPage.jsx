@@ -31,24 +31,57 @@ const SubjectPage = () => {
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  console.log(user);
-  console.log("here");
+  const [controllers, setControllers] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchControllers = async () => {
+      try {
+        const response = await fetch('http://localhost:8080/api/controllers');
+        if (!response.ok) throw new Error('Failed to fetch controllers');
+        const controllers = await response.json();
+        setControllers(controllers);
+        return controllers;
+      } catch (err) {
+        setError('Failed to fetch controllers: ' + err.message);
+        return [];
+      }
+    };
+
+    const fetchDataFromController = async (controllerId) => {
+      try {
+        const response = await fetch(
+          `http://localhost:8080/api/ontop/person/${user.taxid}/controller/${controllerId}`
+        );
+        if (!response.ok) throw new Error('Failed to fetch data');
+        return await response.json();
+      } catch (err) {
+        console.error(`Error fetching from controller ${controllerId}:`, err);
+        return null;
+      }
+    };
+
+    const fetchAllData = async () => {
       if (!user?.taxid) return;
       
       try {
-        const response = await fetch(
-          `http://localhost:8080/api/ontop/person/${user.taxid}/controller/8`
+        const availableControllers = await fetchControllers();
+        
+        const controllerData = await Promise.all(
+          availableControllers.map(controller => 
+            fetchDataFromController(controller.id)
+          )
         );
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch data');
-        }
-        
-        const result = await response.json();
-        setData(result);
+
+        const combinedData = controllerData.reduce((acc, data, index) => {
+          if (data) {
+            Object.entries(data).forEach(([source, properties]) => {
+              acc[`${availableControllers[index].name} - ${source}`] = properties;
+            });
+          }
+          return acc;
+        }, {});
+
+        setData(combinedData);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -56,7 +89,7 @@ const SubjectPage = () => {
       }
     };
 
-    fetchData();
+    fetchAllData();
   }, [user]);
 
   if (loading) {
