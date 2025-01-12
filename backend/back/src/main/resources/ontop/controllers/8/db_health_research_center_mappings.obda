@@ -24,4 +24,12 @@ mappingId patients_Person_birth_date_Mapping
 target :Resource/{patient_id} a schema:Person . :Resource/{patient_id} schema:birthDate "{birth_date}"^^xsd:string .
 source SELECT patient_id, birth_date FROM patients
 
+mappingId medical_records_Patient_health_condition_Mapping
+target :Resource/{record_id} a schema:Patient . :Resource/{record_id} schema:healthCondition "{health_condition}"^^xsd:string .
+source SELECT record_id, health_condition FROM medical_records
+
+mappingId medical_records_Patient_treatment_Mapping
+target :Resource/{record_id} a schema:Patient . :Resource/{record_id} schema:drug "{treatment}"^^xsd:string .
+source SELECT record_id, treatment FROM medical_records
+
 ]]

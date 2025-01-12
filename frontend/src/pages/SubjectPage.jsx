@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../components/AuthContext';
+import React, { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../components/AuthContext";
 import {
   Box,
   Typography,
@@ -20,11 +20,11 @@ import {
   Stack,
   Chip,
   CircularProgress,
-  Alert
-} from '@mui/material';
-import { ExpandMore, Lock } from '@mui/icons-material';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import StorageIcon from '@mui/icons-material/Storage';
+  Alert,
+} from "@mui/material";
+import { ExpandMore, Lock } from "@mui/icons-material";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import StorageIcon from "@mui/icons-material/Storage";
 
 const SubjectPage = () => {
   const { user } = useContext(AuthContext);
@@ -36,13 +36,13 @@ const SubjectPage = () => {
   useEffect(() => {
     const fetchControllers = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/controllers');
-        if (!response.ok) throw new Error('Failed to fetch controllers');
+        const response = await fetch("http://localhost:8080/api/controllers");
+        if (!response.ok) throw new Error("Failed to fetch controllers");
         const controllers = await response.json();
         setControllers(controllers);
         return controllers;
       } catch (err) {
-        setError('Failed to fetch controllers: ' + err.message);
+        setError("Failed to fetch controllers: " + err.message);
         return [];
       }
     };
@@ -52,7 +52,7 @@ const SubjectPage = () => {
         const response = await fetch(
           `http://localhost:8080/api/ontop/person/${user.taxid}/controller/${controllerId}`
         );
-        if (!response.ok) throw new Error('Failed to fetch data');
+        if (!response.ok) throw new Error("Failed to fetch data");
         return await response.json();
       } catch (err) {
         console.error(`Error fetching from controller ${controllerId}:`, err);
@@ -62,12 +62,12 @@ const SubjectPage = () => {
 
     const fetchAllData = async () => {
       if (!user?.taxid) return;
-      
+
       try {
         const availableControllers = await fetchControllers();
-        
+
         const controllerData = await Promise.all(
-          availableControllers.map(controller => 
+          availableControllers.map((controller) =>
             fetchDataFromController(controller.id)
           )
         );
@@ -75,7 +75,8 @@ const SubjectPage = () => {
         const combinedData = controllerData.reduce((acc, data, index) => {
           if (data) {
             Object.entries(data).forEach(([source, properties]) => {
-              acc[`${availableControllers[index].name} - ${source}`] = properties;
+              acc[`${availableControllers[index].name} - ${source}`] =
+                properties;
             });
           }
           return acc;
@@ -94,7 +95,14 @@ const SubjectPage = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -109,25 +117,28 @@ const SubjectPage = () => {
   }
 
   return (
-    <Box sx={{
-      width: '100vw',
-      minHeight: '100vh',
-      backgroundImage: 'radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))',
-      margin: 0,
-      padding: 0
-    }}>
-      <Box sx={{ maxWidth: '1200px', margin: '0 auto', p: 3 }}>
+    <Box
+      sx={{
+        width: "100vw",
+        minHeight: "100vh",
+        backgroundImage:
+          "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      <Box sx={{ maxWidth: "1200px", margin: "0 auto", p: 3 }}>
         <Typography variant="h4" gutterBottom>
           My Personal Data Overview
         </Typography>
-        
+
         {Object.entries(data).map(([source, properties]) => (
           <Accordion key={source} defaultExpanded sx={{ mb: 2 }}>
             <AccordionSummary expandIcon={<ExpandMore />}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <AccountBalanceIcon color="primary" />
                 <Typography variant="h6">{source}</Typography>
-                <Chip 
+                <Chip
                   label="Data Source"
                   size="small"
                   color="primary"
@@ -144,7 +155,9 @@ const SubjectPage = () => {
                         <TableRow>
                           <TableCell width="200px">Property</TableCell>
                           <TableCell>Value</TableCell>
-                          <TableCell align="right" width="100px">Access Policy</TableCell>
+                          <TableCell align="right" width="100px">
+                            Access Policy
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
