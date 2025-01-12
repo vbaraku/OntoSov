@@ -32,4 +32,8 @@ mappingId medical_records_Patient_treatment_Mapping
 target :Resource/{record_id} a schema:Patient . :Resource/{record_id} schema:drug "{treatment}"^^xsd:string .
 source SELECT record_id, treatment FROM medical_records
 
+mappingId medical_records_Event_date_Mapping
+target :Resource/{record_id} a schema:Event . :Resource/{record_id} schema:startDate "{date}"^^xsd:string .
+source SELECT record_id, date FROM medical_records
+
 ]]
