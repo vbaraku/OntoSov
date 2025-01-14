@@ -114,49 +114,77 @@ public class DatabaseConfigService {
     }
 
     public void saveSchemaMappings(MappingRequestDTO request, Long controllerId) throws IOException {
-        // Get database ID from the request
         String databaseName = request.databaseConfig().getDatabaseName();
-
         StringBuilder obdaContent = new StringBuilder();
-
-        // Header
         obdaContent.append("[PrefixDeclaration]\n")
                 .append(":       http://example.org/resource#\n")
                 .append("schema: http://schema.org/\n")
                 .append("xsd:    http://www.w3.org/2001/XMLSchema#\n\n")
                 .append("[MappingDeclaration] @collection [[\n");
 
-        Map<String, String> primaryKeys = new HashMap<>();
+        // Group mappings by table and type
+        Map<String, List<SchemaMappingDTO>> propertyMappings = new HashMap<>();
+        List<SchemaMappingDTO> relationshipMappings = new ArrayList<>();
 
         for (SchemaMappingDTO mapping : request.mappings()) {
-            // Get or fetch primary key for this table
-            String primaryKey = primaryKeys.computeIfAbsent(
-                    mapping.getDatabaseTable(),
-                    table -> getPrimaryKeyColumn(request.databaseConfig(), table)
-            );
+            if (mapping.getTargetTable() != null) {
+                relationshipMappings.add(mapping);
+            } else {
+                propertyMappings.computeIfAbsent(mapping.getDatabaseTable(), k -> new ArrayList<>()).add(mapping);
+            }
+        }
 
-            String mappingId = String.format("%s_%s_%s_Mapping",
-                    mapping.getDatabaseTable(),
-                    mapping.getSchemaClass(),
-                    mapping.getDatabaseColumn().replaceAll("\\s+", "_"));
+        // Generate entity mappings
+        for (Map.Entry<String, List<SchemaMappingDTO>> entry : propertyMappings.entrySet()) {
+            String tableName = entry.getKey();
+            List<SchemaMappingDTO> mappings = entry.getValue();
+            String primaryKey = getPrimaryKeyColumn(request.databaseConfig(), tableName);
+            String schemaClass = mappings.get(0).getSchemaClass();
+
+            StringBuilder target = new StringBuilder();
+            target.append(String.format(":Resource/{%s} a schema:%s", primaryKey, schemaClass));
+
+            StringBuilder source = new StringBuilder();
+            source.append("SELECT ").append(primaryKey);
+
+            for (SchemaMappingDTO mapping : mappings) {
+                target.append(String.format(" ; schema:%s {%s}",
+                        mapping.getSchemaProperty(),
+                        mapping.getDatabaseColumn()));
+                source.append(", ").append(mapping.getDatabaseColumn());
+            }
+            target.append(" .\n");
+
+            obdaContent.append(String.format("mappingId %s_mapping\n", tableName))
+                    .append("target  ").append(target)
+                    .append("source  ").append(source)
+                    .append(" FROM ").append(tableName).append("\n\n");
+        }
+
+        // Generate relationship mappings
+        for (SchemaMappingDTO mapping : relationshipMappings) {
+            String mappingId = mapping.getDatabaseTable() + "_" + mapping.getTargetTable() + "_rel";
 
             obdaContent.append(String.format("mappingId %s\n", mappingId))
-                    .append(String.format("target :Resource/{%s} a schema:%s . ",
-                            primaryKey,
-                            mapping.getSchemaClass()))
-                    .append(String.format(":Resource/{%s} schema:%s \"%s\"^^xsd:string .\n",
-                            primaryKey,
+                    .append(String.format("target  :Resource/{order_id} schema:%s :Resource/{%s} .\n",
                             mapping.getSchemaProperty(),
-                            "{" + mapping.getDatabaseColumn() + "}"))
-                    .append(String.format("source SELECT %s, %s FROM %s\n\n",
-                            primaryKey,
-                            mapping.getDatabaseColumn().equals(primaryKey) ? primaryKey + " as id" : mapping.getDatabaseColumn(),
-                            mapping.getDatabaseTable()));
+                            mapping.getTargetKey()))
+                    .append("source  ")
+                    .append("SELECT o.order_id, t.")
+                    .append(mapping.getTargetKey())
+                    .append(" FROM ")
+                    .append(mapping.getDatabaseTable())
+                    .append(" o JOIN ")
+                    .append(mapping.getTargetTable())
+                    .append(" t ON o.")
+                    .append(mapping.getDatabaseColumn())
+                    .append(" = t.")
+                    .append(mapping.getSourceKey())
+                    .append("\n\n");
         }
 
         obdaContent.append("]]");
 
-        // Save OBDA file with database-specific path
         String obdaPath = getObdaPath(controllerId, databaseName);
         Files.createDirectories(Paths.get(obdaPath).getParent());
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
