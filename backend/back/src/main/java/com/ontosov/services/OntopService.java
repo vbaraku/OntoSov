@@ -178,30 +178,29 @@ public class OntopService {
 
     public String getPersonDataQuery() {
         return """
-        PREFIX schema: <http://schema.org/>
-        PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        
-        SELECT ?property ?value
-        WHERE {
-            ?person a schema:Person ;
-                    schema:taxID ?taxId .
-            {
-                ?person ?property ?value .
-                FILTER(?property != rdf:type && ?property != schema:taxID)
-            } UNION {
-                ?order schema:customer ?person ;
-                       ?property ?value .
-                FILTER(?property != rdf:type)
-            } UNION {
-                ?order schema:customer ?person ;
-                       schema:orderedItem ?product .
-                ?product ?property ?value .
-                FILTER(?property != rdf:type)
-            }
-            FILTER(?taxId = ?taxIdParam)
+    PREFIX schema: <http://schema.org/>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    
+    SELECT ?property ?value
+    WHERE {
+        ?person a schema:Person ;
+                schema:taxID ?taxIdParam .
+        {
+            ?person ?property ?value .
+            FILTER(?property != rdf:type && ?property != schema:taxID)
+        } UNION {
+            ?order schema:customer ?person ;
+                   ?property ?value .
+            FILTER(?property != rdf:type)
+        } UNION {
+            ?order schema:customer ?person ;
+                   schema:orderedItem ?product .
+            ?product ?property ?value .
+            FILTER(?property != rdf:type)
         }
-        """;
+    }
+    """;
     }
 
     private static class DatabaseConfig {

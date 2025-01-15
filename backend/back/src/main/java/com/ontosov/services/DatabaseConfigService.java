@@ -122,7 +122,7 @@ public class DatabaseConfigService {
                 .append("xsd:    http://www.w3.org/2001/XMLSchema#\n\n")
                 .append("[MappingDeclaration] @collection [[\n");
 
-        // Group mappings by table and type
+        // Group mappings by main entity
         Map<String, List<SchemaMappingDTO>> propertyMappings = new HashMap<>();
         List<SchemaMappingDTO> relationshipMappings = new ArrayList<>();
 
@@ -158,29 +158,33 @@ public class DatabaseConfigService {
             obdaContent.append(String.format("mappingId %s_mapping\n", tableName))
                     .append("target  ").append(target)
                     .append("source  ").append(source)
-                    .append(" FROM ").append(tableName).append("\n\n");
+                    .append(" FROM ").append(tableName)
+                    .append("\n\n");
         }
 
         // Generate relationship mappings
         for (SchemaMappingDTO mapping : relationshipMappings) {
             String mappingId = mapping.getDatabaseTable() + "_" + mapping.getTargetTable() + "_rel";
+            String sourceTable = mapping.getDatabaseTable();
+            String targetTable = mapping.getTargetTable();
 
+            // For relationship mappings
             obdaContent.append(String.format("mappingId %s\n", mappingId))
                     .append(String.format("target  :Resource/{order_id} schema:%s :Resource/{%s} .\n",
                             mapping.getSchemaProperty(),
                             mapping.getTargetKey()))
-                    .append("source  ")
-                    .append("SELECT o.order_id, t.")
+                    .append("source  SELECT s.order_id, t.")
                     .append(mapping.getTargetKey())
                     .append(" FROM ")
-                    .append(mapping.getDatabaseTable())
-                    .append(" o JOIN ")
-                    .append(mapping.getTargetTable())
-                    .append(" t ON o.")
-                    .append(mapping.getDatabaseColumn())
+                    .append(sourceTable)
+                    .append(" s JOIN ")
+                    .append(targetTable)
+                    .append(" t ON s.")
+                    .append(mapping.getDatabaseColumn()) // This is user_id for customer, product_id for orderedItem
                     .append(" = t.")
-                    .append(mapping.getSourceKey())
-                    .append("\n\n");
+                    .append(mapping.getTargetKey());     // This is user_id for Person, product_id for Product
+
+            obdaContent.append("\n\n");
         }
 
         obdaContent.append("]]");
@@ -188,6 +192,18 @@ public class DatabaseConfigService {
         String obdaPath = getObdaPath(controllerId, databaseName);
         Files.createDirectories(Paths.get(obdaPath).getParent());
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
+    }
+    private boolean hasUserIdColumn(DatabaseConfigDTO config, String tableName) {
+        try (Connection conn = DriverManager.getConnection(
+                config.getJdbcUrl(),
+                config.getUsername(),
+                config.getPassword())) {
+            DatabaseMetaData metaData = conn.getMetaData();
+            ResultSet columns = metaData.getColumns(null, null, tableName, "user_id");
+            return columns.next();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to check for user_id column", e);
+        }
     }
 
     public List<SchemaMappingDTO> getMappings(Long controllerId, String dbId) throws IOException {
