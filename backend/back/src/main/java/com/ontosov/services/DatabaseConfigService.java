@@ -207,84 +207,98 @@ public class DatabaseConfigService {
     }
 
     public List<SchemaMappingDTO> getMappings(Long controllerId, String dbId) throws IOException {
+        List<SchemaMappingDTO> mappings = new ArrayList<>();
         String obdaPath = getObdaPath(controllerId, dbId);
         if (!Files.exists(Paths.get(obdaPath))) {
-            return new ArrayList<>();
+            return mappings;
         }
 
-        List<SchemaMappingDTO> mappings = new ArrayList<>();
         List<String> lines = Files.readAllLines(Paths.get(obdaPath));
-
         String currentTable = null;
-        String currentColumn = null;
         String currentClass = null;
-        String currentProperty = null;
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i).trim();
+            if (line.startsWith("[") || line.isEmpty()) continue;
 
-            // Skip header sections and empty lines
-            if (line.startsWith("[") || line.isEmpty()) {
-                continue;
-            }
-
-            // Beginning of a new mapping
             if (line.startsWith("mappingId")) {
-                // Clear previous values
                 currentTable = null;
-                currentColumn = null;
                 currentClass = null;
-                currentProperty = null;
-
-                // Process target line (next line)
                 String targetLine = lines.get(++i).trim();
+
                 if (targetLine.startsWith("target")) {
-                    // Extract schema class
-                    if (targetLine.contains("schema:")) {
+                    Pattern relationPattern = Pattern.compile(":Resource/\\{[^}]+\\} schema:([^ ]+) :Resource");
+                    Matcher relationMatcher = relationPattern.matcher(targetLine);
+
+                    if (relationMatcher.find()) {
+                        // Handle relationship mapping
+                        SchemaMappingDTO relationMapping = new SchemaMappingDTO();
+                        relationMapping.setIsRelationship(true);
+                        relationMapping.setSchemaProperty(relationMatcher.group(1));
+
+                        String sourceLine = lines.get(++i).trim();
+                        if (sourceLine.startsWith("source")) {
+                            Pattern joinPattern = Pattern.compile("FROM ([^ ]+) s JOIN ([^ ]+) t ON s\\.([^ ]+) = t\\.([^ ]+)");
+                            Matcher joinMatcher = joinPattern.matcher(sourceLine);
+                            if (joinMatcher.find()) {
+                                relationMapping.setDatabaseTable(joinMatcher.group(1));
+                                relationMapping.setTargetTable(joinMatcher.group(2));
+                                relationMapping.setDatabaseColumn(joinMatcher.group(3));
+                                relationMapping.setTargetKey(joinMatcher.group(4));
+                                // Find schema class from target table's mapping
+                                relationMapping.setSchemaClass(findSchemaClassForTable(lines, joinMatcher.group(2)));
+                                mappings.add(relationMapping);
+                            }
+                        }
+                    } else {
+                        // Handle property mappings
                         Pattern classPattern = Pattern.compile("a schema:([^ ]+)");
                         Matcher classMatcher = classPattern.matcher(targetLine);
                         if (classMatcher.find()) {
                             currentClass = classMatcher.group(1);
                         }
 
-                        // Extract schema property
-                        Pattern propertyPattern = Pattern.compile("schema:([^ ]+) \"");
+                        Pattern propertyPattern = Pattern.compile("schema:([^ ]+) \\{([^}]+)\\}");
                         Matcher propertyMatcher = propertyPattern.matcher(targetLine);
-                        if (propertyMatcher.find()) {
-                            currentProperty = propertyMatcher.group(1);
-                        }
-                    }
-                }
 
-                // Process source line (next line)
-                String sourceLine = lines.get(++i).trim();
-                if (sourceLine.startsWith("source")) {
-                    String[] parts = sourceLine.split("FROM");
-                    if (parts.length > 1) {
-                        currentTable = parts[1].trim();
-                        String[] selectParts = parts[0].split("SELECT")[1].trim().split(",");
-                        for (String part : selectParts) {
-                            if (!part.contains("user_id")) { // Skip ID column
-                                currentColumn = part.trim();
+                        String sourceLine = lines.get(++i).trim();
+                        if (sourceLine.startsWith("source")) {
+                            Pattern tablePattern = Pattern.compile("FROM ([^ ]+)");
+                            Matcher tableMatcher = tablePattern.matcher(sourceLine);
+                            if (tableMatcher.find()) {
+                                currentTable = tableMatcher.group(1);
                             }
                         }
-                    }
-                }
 
-                // If we have all components, create a mapping
-                if (currentTable != null && currentColumn != null &&
-                        currentClass != null && currentProperty != null) {
-                    mappings.add(new SchemaMappingDTO(
-                            currentTable,
-                            currentColumn,
-                            currentClass,
-                            currentProperty
-                    ));
+                        while (propertyMatcher.find()) {
+                            SchemaMappingDTO propertyMapping = new SchemaMappingDTO();
+                            propertyMapping.setIsRelationship(false);
+                            propertyMapping.setSchemaClass(currentClass);
+                            propertyMapping.setDatabaseTable(currentTable);
+                            propertyMapping.setSchemaProperty(propertyMatcher.group(1));
+                            propertyMapping.setDatabaseColumn(propertyMatcher.group(2));
+                            mappings.add(propertyMapping);
+                        }
+                    }
                 }
             }
         }
-
         return mappings;
+    }
+
+    private String findSchemaClassForTable(List<String> lines, String tableName) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.startsWith("mappingId") && line.contains(tableName)) {
+                String targetLine = lines.get(i + 1).trim();
+                Pattern classPattern = Pattern.compile("a schema:([^ ]+)");
+                Matcher classMatcher = classPattern.matcher(targetLine);
+                if (classMatcher.find()) {
+                    return classMatcher.group(1);
+                }
+            }
+        }
+        return null;
     }
     public List<DatabaseConfigDTO> getDatabasesForController(Long controllerId) throws IOException {
         String configPath = getConfigPath(controllerId);

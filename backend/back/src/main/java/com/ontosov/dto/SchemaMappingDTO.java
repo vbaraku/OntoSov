@@ -6,6 +6,7 @@ import lombok.Data;
 public class SchemaMappingDTO {
     private String databaseTable;
     private String databaseColumn;
+    private Boolean isRelationship;
     private String joinTable;     // For many-to-many
     private String targetTable;   // The table being joined to
     private String sourceKey;     // Foreign key from source
@@ -22,14 +23,16 @@ public class SchemaMappingDTO {
         this.schemaProperty = schemaProperty;
     }
 
-    public SchemaMappingDTO(String databaseTable, String databaseColumn, String joinTable, String targetTable, String sourceKey, String targetKey, String schemaClass, String schemaProperty) {
+    public SchemaMappingDTO(String databaseTable, String databaseColumn, Boolean isRelationship ,String joinTable, String targetTable, String sourceKey, String targetKey, String schemaClass, String schemaProperty) {
         this.databaseTable = databaseTable;
         this.databaseColumn = databaseColumn;
+        this.isRelationship = isRelationship;
         this.joinTable = joinTable;
         this.targetTable = targetTable;
         this.sourceKey = sourceKey;
         this.targetKey = targetKey;
         this.schemaClass = schemaClass;
         this.schemaProperty = schemaProperty;
+
     }
 }

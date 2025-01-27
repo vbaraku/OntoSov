@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 
-const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
+const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode }) => {
   const [mappings, setMappings] = useState([]);
   const [selectedSourceTable, setSelectedSourceTable] = useState("");
   const [selectedSourceColumn, setSelectedSourceColumn] = useState("");
@@ -35,6 +35,7 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
   const [schemaClassOptions, setSchemaClassOptions] = useState([]);
   const [schemaPropertyOptions, setSchemaPropertyOptions] = useState([]);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const searchSchemaClasses = async (query) => {
     try {
@@ -62,10 +63,70 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
   };
 
   useEffect(() => {
+    const loadExistingMappings = async () => {
+      if (!isEditMode || !controllerId || !dbConfig?.databaseName) {
+        console.log("Missing required props:", { isEditMode, controllerId, dbConfig });
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `http://localhost:8080/api/database/mappings/${controllerId}/${dbConfig.databaseName}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch mappings");
+        
+        const existingMappings = await response.json();
+        const formattedMappings = existingMappings.map((mapping, index) => ({
+          id: index,
+          sourceTable: mapping.databaseTable,
+          sourceColumn: mapping.databaseColumn,
+          targetTable: mapping.targetTable || null,
+          targetColumn: mapping.targetKey || null,
+          schemaClass: mapping.schemaClass,
+          schemaProperty: mapping.schemaProperty,
+          isRelationship: mapping.isRelationship || false
+        }));
+   
+        setMappings(formattedMappings);
+   
+        if (formattedMappings.length > 0) {
+          const firstMapping = formattedMappings[0];
+          setIsRelationshipMapping(firstMapping.isRelationship);
+          setSelectedSourceTable(firstMapping.sourceTable);
+          setSelectedSourceColumn(firstMapping.sourceColumn);
+          
+          if (firstMapping.isRelationship) {
+            setSelectedTargetTable(firstMapping.targetTable);
+            setSelectedTargetColumn(firstMapping.targetColumn);
+          }
+          
+          setSelectedSchemaClass(firstMapping.schemaClass);
+          setSelectedSchemaProperty(firstMapping.schemaProperty);
+          
+          if (firstMapping.schemaClass) {
+            await fetchSchemaProperties(firstMapping.schemaClass);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching mappings:", error);
+        setSaveStatus({ type: "error", message: error.message });
+      } finally {
+        setLoading(false);
+      }
+    };
+   
+    loadExistingMappings();
+   }, [isEditMode, controllerId, dbConfig]);
+   
+   useEffect(() => {
     if (selectedSchemaClass) {
       fetchSchemaProperties(selectedSchemaClass);
+      setSelectedSchemaProperty(null);
+    } else {
+      setSchemaPropertyOptions([]);
     }
-  }, [selectedSchemaClass]);
+   }, [selectedSchemaClass]);
 
   const getColumnsForTable = (tableName) => {
     const table = tables.find((t) => t.name === tableName);
@@ -223,7 +284,7 @@ const SchemaMapper = ({ tables, dbConfig, controllerId }) => {
           <Grid item xs={6}>
             <Autocomplete
               value={selectedSchemaClass}
-              onChange={(_, newValue) => setSelectedSchemaClass(newValue)}
+              onChange={(_, newValue) => {setSelectedSchemaClass(newValue); setSelectedSchemaProperty(null)}}
               onInputChange={(_, newInputValue, reason) => {
                 if (reason === 'input') {
                   searchSchemaClasses(newInputValue);
