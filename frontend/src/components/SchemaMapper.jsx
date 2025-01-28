@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Paper,
-  Typography,
-  Select,
-  MenuItem,
   FormControl,
   InputLabel,
+  Select,
+  MenuItem,
   TextField,
   Button,
   Grid,
@@ -17,108 +15,146 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Paper,
   Autocomplete,
-  CircularProgress,
+  Switch,
+  FormControlLabel,
   Alert,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
 
-const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) => {
+const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode }) => {
   const [mappings, setMappings] = useState([]);
-  const [selectedTable, setSelectedTable] = useState("");
-  const [selectedColumn, setSelectedColumn] = useState("");
+  const [selectedSourceTable, setSelectedSourceTable] = useState("");
+  const [selectedSourceColumn, setSelectedSourceColumn] = useState("");
+  const [selectedTargetTable, setSelectedTargetTable] = useState("");
+  const [selectedTargetColumn, setSelectedTargetColumn] = useState("");
+  const [isRelationshipMapping, setIsRelationshipMapping] = useState(false);
   const [selectedSchemaClass, setSelectedSchemaClass] = useState(null);
   const [selectedSchemaProperty, setSelectedSchemaProperty] = useState(null);
   const [schemaClassOptions, setSchemaClassOptions] = useState([]);
   const [schemaPropertyOptions, setSchemaPropertyOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
-
-  // Load existing mappings when in edit mode
-  useEffect(() => {
-    if (isEditMode && controllerId) {
-      fetchExistingMappings();
-    }
-  }, [isEditMode, controllerId]);
-
-  const fetchExistingMappings = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `http://localhost:8080/api/database/mappings/${controllerId}/${dbConfig.databaseName}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch existing mappings");
-      const existingMappings = await response.json();
-      setMappings(existingMappings.map((mapping, index) => ({
-        ...mapping,
-        id: index
-      })));
-    } catch (error) {
-      console.error("Error fetching mappings:", error);
-      setSaveStatus({ type: "error", message: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getColumnsForTable = (tableName) => {
-    const table = tables.find((t) => t.name === tableName);
-    return table ? table.columns : [];
-  };
+  const [loading, setLoading] = useState(false);
 
   const searchSchemaClasses = async (query) => {
     try {
       const response = await fetch(
         `http://localhost:8080/api/schema/classes?query=${encodeURIComponent(query)}`
       );
-      if (!response.ok) throw new Error("Failed to fetch schema classes");
       const data = await response.json();
       setSchemaClassOptions(data);
     } catch (error) {
-      console.error("Error:", error);
-      setSaveStatus({ type: "error", message: error.message });
+      console.error("Error fetching schema classes:", error);
     }
   };
 
   const fetchSchemaProperties = async (className) => {
     if (!className) return;
     try {
-      setLoading(true);
       const response = await fetch(
         `http://localhost:8080/api/schema/properties/${encodeURIComponent(className)}`
       );
-      if (!response.ok) throw new Error("Failed to fetch schema properties");
       const data = await response.json();
       setSchemaPropertyOptions(data);
     } catch (error) {
-      console.error("Error:", error);
-      setSaveStatus({ type: "error", message: error.message });
-    } finally {
-      setLoading(false);
+      console.error("Error fetching schema properties:", error);
     }
   };
 
   useEffect(() => {
+    const loadExistingMappings = async () => {
+      if (!isEditMode || !controllerId || !dbConfig?.databaseName) {
+        console.log("Missing required props:", { isEditMode, controllerId, dbConfig });
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `http://localhost:8080/api/database/mappings/${controllerId}/${dbConfig.databaseName}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch mappings");
+        
+        const existingMappings = await response.json();
+        const formattedMappings = existingMappings.map((mapping, index) => ({
+          id: index,
+          sourceTable: mapping.databaseTable,
+          sourceColumn: mapping.databaseColumn,
+          targetTable: mapping.targetTable || null,
+          targetColumn: mapping.targetKey || null,
+          schemaClass: mapping.schemaClass,
+          schemaProperty: mapping.schemaProperty,
+          isRelationship: mapping.isRelationship || false
+        }));
+   
+        setMappings(formattedMappings);
+   
+        if (formattedMappings.length > 0) {
+          const firstMapping = formattedMappings[0];
+          setIsRelationshipMapping(firstMapping.isRelationship);
+          setSelectedSourceTable(firstMapping.sourceTable);
+          setSelectedSourceColumn(firstMapping.sourceColumn);
+          
+          if (firstMapping.isRelationship) {
+            setSelectedTargetTable(firstMapping.targetTable);
+            setSelectedTargetColumn(firstMapping.targetColumn);
+          }
+          
+          setSelectedSchemaClass(firstMapping.schemaClass);
+          setSelectedSchemaProperty(firstMapping.schemaProperty);
+          
+          if (firstMapping.schemaClass) {
+            await fetchSchemaProperties(firstMapping.schemaClass);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching mappings:", error);
+        setSaveStatus({ type: "error", message: error.message });
+      } finally {
+        setLoading(false);
+      }
+    };
+   
+    loadExistingMappings();
+   }, [isEditMode, controllerId, dbConfig]);
+   
+   useEffect(() => {
     if (selectedSchemaClass) {
       fetchSchemaProperties(selectedSchemaClass);
+      setSelectedSchemaProperty(null);
+    } else {
+      setSchemaPropertyOptions([]);
     }
-  }, [selectedSchemaClass]);
+   }, [selectedSchemaClass]);
+
+  const getColumnsForTable = (tableName) => {
+    const table = tables.find((t) => t.name === tableName);
+    return table ? table.columns : [];
+  };
 
   const handleAddMapping = () => {
-    if (selectedTable && selectedColumn && selectedSchemaClass && selectedSchemaProperty) {
-      const newMapping = {
-        id: Date.now(),
-        databaseTable: selectedTable,
-        databaseColumn: selectedColumn,
-        schemaClass: selectedSchemaClass,
-        schemaProperty: selectedSchemaProperty,
-      };
-      setMappings([...mappings, newMapping]);
-      setSelectedColumn("");
-      setSelectedSchemaProperty(null);
-      setSelectedSchemaClass(null);
-    }
+    const newMapping = {
+      id: Date.now(),
+      sourceTable: selectedSourceTable,
+      sourceColumn: selectedSourceColumn,
+      targetTable: isRelationshipMapping ? selectedTargetTable : null,
+      targetColumn: isRelationshipMapping ? selectedTargetColumn : null,
+      schemaClass: selectedSchemaClass,
+      schemaProperty: selectedSchemaProperty,
+      isRelationship: isRelationshipMapping,
+    };
+    setMappings([...mappings, newMapping]);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setSelectedSourceTable("");
+    setSelectedSourceColumn("");
+    setSelectedTargetTable("");
+    setSelectedTargetColumn("");
+    setSelectedSchemaClass(null);
+    setSelectedSchemaProperty(null);
   };
 
   const handleSaveMapping = async () => {
@@ -128,10 +164,13 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
       const mappingRequest = {
         databaseConfig: dbConfig,
         mappings: mappings.map((m) => ({
-          databaseTable: m.databaseTable,
-          databaseColumn: m.databaseColumn,
+          databaseTable: m.sourceTable,       // Using sourceTable instead of databaseTable
+          databaseColumn: m.sourceColumn,     // Using sourceColumn instead of databaseColumn
+          targetTable: m.targetTable,
+          sourceKey: m.sourceColumn,          // For relationships, source column is the foreign key
+          targetKey: m.targetColumn,          // Target column is usually the primary key
           schemaClass: m.schemaClass,
-          schemaProperty: m.schemaProperty,
+          schemaProperty: m.schemaProperty
         })),
       };
 
@@ -152,25 +191,29 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
     }
   };
 
-  if (loading && mappings.length === 0) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ maxWidth: 800, mx: "auto" }}>
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isRelationshipMapping}
+                  onChange={(e) => setIsRelationshipMapping(e.target.checked)}
+                />
+              }
+              label="Create Relationship Mapping"
+            />
+          </Grid>
+
           <Grid item xs={6}>
             <FormControl fullWidth>
-              <InputLabel>Table</InputLabel>
+              <InputLabel>Source Table</InputLabel>
               <Select
-                value={selectedTable}
-                label="Table"
-                onChange={(e) => setSelectedTable(e.target.value)}
+                value={selectedSourceTable}
+                label="Source Table"
+                onChange={(e) => setSelectedSourceTable(e.target.value)}
               >
                 {tables.map((table) => (
                   <MenuItem key={table.name} value={table.name}>
@@ -183,26 +226,65 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
 
           <Grid item xs={6}>
             <FormControl fullWidth>
-              <InputLabel>Column</InputLabel>
+              <InputLabel>Source Column</InputLabel>
               <Select
-                value={selectedColumn}
-                label="Column"
-                onChange={(e) => setSelectedColumn(e.target.value)}
-                disabled={!selectedTable}
+                value={selectedSourceColumn}
+                label="Source Column"
+                onChange={(e) => setSelectedSourceColumn(e.target.value)}
+                disabled={!selectedSourceTable}
               >
-                {getColumnsForTable(selectedTable).map((column) => (
+                {getColumnsForTable(selectedSourceTable).map((column) => (
                   <MenuItem key={column.name} value={column.name}>
-                    {column.name} ({column.type})
+                    {column.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
 
+          {isRelationshipMapping && (
+            <>
+              <Grid item xs={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Target Table</InputLabel>
+                  <Select
+                    value={selectedTargetTable}
+                    label="Target Table"
+                    onChange={(e) => setSelectedTargetTable(e.target.value)}
+                  >
+                    {tables.map((table) => (
+                      <MenuItem key={table.name} value={table.name}>
+                        {table.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Target Column</InputLabel>
+                  <Select
+                    value={selectedTargetColumn}
+                    label="Target Column"
+                    onChange={(e) => setSelectedTargetColumn(e.target.value)}
+                    disabled={!selectedTargetTable}
+                  >
+                    {getColumnsForTable(selectedTargetTable).map((column) => (
+                      <MenuItem key={column.name} value={column.name}>
+                        {column.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </>
+          )}
+
           <Grid item xs={6}>
             <Autocomplete
               value={selectedSchemaClass}
-              onChange={(_, newValue) => setSelectedSchemaClass(newValue)}
+              onChange={(_, newValue) => {setSelectedSchemaClass(newValue); setSelectedSchemaProperty(null)}}
               onInputChange={(_, newInputValue, reason) => {
                 if (reason === 'input') {
                   searchSchemaClasses(newInputValue);
@@ -210,12 +292,8 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
               }}
               options={schemaClassOptions}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Schema.org Class"
-                />
+                <TextField {...params} label="Schema.org Class" />
               )}
-              loading={loading}
             />
           </Grid>
 
@@ -234,14 +312,8 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
           <Grid item xs={12}>
             <Button
               variant="contained"
-              startIcon={<AddIcon />}
               onClick={handleAddMapping}
-              disabled={
-                !selectedTable ||
-                !selectedColumn ||
-                !selectedSchemaClass ||
-                !selectedSchemaProperty
-              }
+              disabled={!selectedSourceTable || !selectedSourceColumn || !selectedSchemaClass || !selectedSchemaProperty}
             >
               Add Mapping
             </Button>
@@ -259,26 +331,29 @@ const SchemaMapper = ({ tables, dbConfig, controllerId, isEditMode = false }) =>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Database Table</TableCell>
-              <TableCell>Database Column</TableCell>
-              <TableCell>Schema.org Class</TableCell>
-              <TableCell>Schema.org Property</TableCell>
+              <TableCell>Source Table</TableCell>
+              <TableCell>Source Column</TableCell>
+              <TableCell>Target Table</TableCell>
+              <TableCell>Target Column</TableCell>
+              <TableCell>Schema Class</TableCell>
+              <TableCell>Schema Property</TableCell>
+              <TableCell>Type</TableCell>
               <TableCell>Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {mappings.map((mapping) => (
               <TableRow key={mapping.id}>
-                <TableCell>{mapping.databaseTable}</TableCell>
-                <TableCell>{mapping.databaseColumn}</TableCell>
+                <TableCell>{mapping.sourceTable}</TableCell>
+                <TableCell>{mapping.sourceColumn}</TableCell>
+                <TableCell>{mapping.targetTable || "-"}</TableCell>
+                <TableCell>{mapping.targetColumn || "-"}</TableCell>
                 <TableCell>{mapping.schemaClass}</TableCell>
                 <TableCell>{mapping.schemaProperty}</TableCell>
+                <TableCell>{mapping.isRelationship ? "Relationship" : "Property"}</TableCell>
                 <TableCell>
                   <IconButton
-                    size="small"
-                    onClick={() =>
-                      setMappings(mappings.filter((m) => m.id !== mapping.id))
-                    }
+                    onClick={() => setMappings(mappings.filter((m) => m.id !== mapping.id))}
                   >
                     <DeleteIcon />
                   </IconButton>
