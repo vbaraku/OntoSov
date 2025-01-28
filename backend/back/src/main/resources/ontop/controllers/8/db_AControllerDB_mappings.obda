@@ -13,15 +13,15 @@ target  :Resource/{user_id} a schema:Person ; schema:taxID {tax_id} ; schema:giv
 source  SELECT user_id, tax_id, name FROM user_profiles
 
 mappingId products_mapping
-target  :Resource/{product_id} a schema:Product ; schema:model {name} ; schema:category {category} .
-source  SELECT product_id, name, category FROM products
-
-mappingId order_history_products_rel
-target  :Resource/{order_id} schema:orderedItem :Resource/{product_id} .
-source  SELECT s.order_id, t.product_id FROM order_history s JOIN products t ON s.product_id = t.product_id
+target  :Resource/{product_id} a schema:Product ; schema:category {category} ; schema:model {name} .
+source  SELECT product_id, category, name FROM products
 
 mappingId order_history_user_profiles_rel
 target  :Resource/{order_id} schema:customer :Resource/{user_id} .
 source  SELECT s.order_id, t.user_id FROM order_history s JOIN user_profiles t ON s.user_id = t.user_id
+
+mappingId order_history_products_rel
+target  :Resource/{order_id} schema:orderedItem :Resource/{product_id} .
+source  SELECT s.order_id, t.product_id FROM order_history s JOIN products t ON s.product_id = t.product_id
 
 ]]
