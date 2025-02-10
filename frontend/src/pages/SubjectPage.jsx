@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useContext } from "react";
-import { AuthContext } from "../components/AuthContext";
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../components/AuthContext';
+import PolicyCreator from '../components/PolicyCreator';
 import {
   Box,
   Typography,
@@ -21,88 +22,97 @@ import {
   Chip,
   CircularProgress,
   Alert,
-} from "@mui/material";
-import { ExpandMore, Lock } from "@mui/icons-material";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import StorageIcon from "@mui/icons-material/Storage";
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Button
+} from '@mui/material';
+import { ExpandMore, Lock, Security } from '@mui/icons-material';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
 const SubjectPage = () => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [policyDialogOpen, setPolicyDialogOpen] = useState(false);
   const [controllers, setControllers] = useState([]);
+  const [policies, setPolicies] = useState([]);
 
   useEffect(() => {
-    const fetchControllers = async () => {
-      try {
-        const response = await fetch("http://localhost:8080/api/controllers");
-        if (!response.ok) throw new Error("Failed to fetch controllers");
-        const controllers = await response.json();
-        setControllers(controllers);
-        return controllers;
-      } catch (err) {
-        setError("Failed to fetch controllers: " + err.message);
-        return [];
-      }
-    };
-
-    const fetchDataFromController = async (controllerId) => {
-      try {
-        const response = await fetch(
-          `http://localhost:8080/api/ontop/person/${user.taxid}/controller/${controllerId}`
-        );
-        if (!response.ok) throw new Error("Failed to fetch data");
-        return await response.json();
-      } catch (err) {
-        console.error(`Error fetching from controller ${controllerId}:`, err);
-        return null;
-      }
-    };
-
-    const fetchAllData = async () => {
-      if (!user?.taxid) return;
-
-      try {
-        const availableControllers = await fetchControllers();
-
-        const controllerData = await Promise.all(
-          availableControllers.map((controller) =>
-            fetchDataFromController(controller.id)
-          )
-        );
-
-        const combinedData = controllerData.reduce((acc, data, index) => {
-          if (data) {
-            Object.entries(data).forEach(([source, properties]) => {
-              acc[`${availableControllers[index].name} - ${source}`] =
-                properties;
-            });
-          }
-          return acc;
-        }, {});
-
-        setData(combinedData);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllData();
+    fetchData();
+    fetchPolicies();
   }, [user]);
+
+  const fetchData = async () => {
+    if (!user?.taxid) return;
+    
+    try {
+      const availableControllers = await fetch('http://localhost:8080/api/controllers')
+        .then(res => res.json());
+      setControllers(availableControllers);
+      
+      const controllerData = await Promise.all(
+        availableControllers.map(controller => 
+          fetch(`http://localhost:8080/api/ontop/person/${user.taxid}/controller/${controller.id}`)
+            .then(res => res.json())
+            .catch(err => null)
+        )
+      );
+
+      const combinedData = controllerData.reduce((acc, data, index) => {
+        if (data) {
+          Object.entries(data).forEach(([source, properties]) => {
+            acc[`${availableControllers[index].name} - ${source}`] = properties;
+          });
+        }
+        return acc;
+      }, {});
+
+      setData(combinedData);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const fetchPolicies = async () => {
+    // if (!user?.id) return;
+    // try {
+    //   const response = await fetch(`http://localhost:8080/api/policies/${user.id}`);
+    //   const policies = await response.json();
+    //   setPolicies(policies);
+    // } catch (error) {
+    //   console.error('Error fetching policies:', error);
+    // }
+  };
+
+  const handleCreatePolicy = async (policy) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/policies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subjectId: user.id,
+          ...policy
+        }),
+      });
+
+      if (response.ok) {
+        await fetchPolicies();
+        setPolicyDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error creating policy:', error);
+    }
+  };
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
       </Box>
     );
@@ -117,20 +127,24 @@ const SubjectPage = () => {
   }
 
   return (
-    <Box
-      sx={{
-        width: "100vw",
-        minHeight: "100vh",
-        backgroundImage:
-          "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
-        margin: 0,
-        padding: 0,
-      }}
-    >
-      <Box sx={{ maxWidth: "1200px", margin: "0 auto", p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          My Personal Data Overview
-        </Typography>
+    <Box sx={{
+      width: '100vw',
+      minHeight: '100vh',
+      backgroundImage: 'radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))',
+      margin: 0,
+      padding: 0
+    }}>
+      <Box sx={{ maxWidth: '1200px', margin: '0 auto', p: 3 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">My Personal Data Overview</Typography>
+          <Button
+            variant="contained"
+            startIcon={<Security />}
+            onClick={() => setPolicyDialogOpen(true)}
+          >
+            Create New Policy
+          </Button>
+        </Stack>
 
         {Object.entries(data).map(([source, properties]) => (
           <Accordion key={source} defaultExpanded sx={{ mb: 2 }}>
@@ -138,7 +152,7 @@ const SubjectPage = () => {
               <Stack direction="row" spacing={2} alignItems="center">
                 <AccountBalanceIcon color="primary" />
                 <Typography variant="h6">{source}</Typography>
-                <Chip
+                <Chip 
                   label="Data Source"
                   size="small"
                   color="primary"
@@ -155,9 +169,7 @@ const SubjectPage = () => {
                         <TableRow>
                           <TableCell width="200px">Property</TableCell>
                           <TableCell>Value</TableCell>
-                          <TableCell align="right" width="100px">
-                            Access Policy
-                          </TableCell>
+                          <TableCell align="right" width="100px">Policies</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -166,9 +178,13 @@ const SubjectPage = () => {
                             <TableCell>{property}</TableCell>
                             <TableCell>{value}</TableCell>
                             <TableCell align="right">
-                              <Tooltip title="Configure Access Policy">
+                              <Tooltip title="View Active Policies">
                                 <IconButton size="small">
-                                  <Lock />
+                                  <Lock color={
+                                    policies.some(p => 
+                                      p.target[source]?.[property]
+                                    ) ? "primary" : "inherit"
+                                  } />
                                 </IconButton>
                               </Tooltip>
                             </TableCell>
@@ -182,6 +198,21 @@ const SubjectPage = () => {
             </AccordionDetails>
           </Accordion>
         ))}
+
+        <Dialog
+          open={policyDialogOpen}
+          onClose={() => setPolicyDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Create New Policy</DialogTitle>
+          <DialogContent>
+            <PolicyCreator 
+              data={data}
+              onPolicyCreate={handleCreatePolicy}
+            />
+          </DialogContent>
+        </Dialog>
       </Box>
     </Box>
   );
