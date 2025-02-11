@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../components/AuthContext';
-import PolicyCreator from '../components/PolicyCreator';
+import PolicyGroupsManager from '../components/PolicyGroupsManager';
 import {
   Box,
   Typography,
@@ -25,9 +25,13 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  Button
+  Button,
 } from '@mui/material';
-import { ExpandMore, Lock, Security } from '@mui/icons-material';
+import { 
+  ExpandMore, 
+  Lock, 
+  Security,
+} from '@mui/icons-material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
 const SubjectPage = () => {
@@ -41,7 +45,6 @@ const SubjectPage = () => {
 
   useEffect(() => {
     fetchData();
-    fetchPolicies();
   }, [user]);
 
   const fetchData = async () => {
@@ -77,36 +80,21 @@ const SubjectPage = () => {
     }
   };
 
-  const fetchPolicies = async () => {
-    // if (!user?.id) return;
-    // try {
-    //   const response = await fetch(`http://localhost:8080/api/policies/${user.id}`);
-    //   const policies = await response.json();
-    //   setPolicies(policies);
-    // } catch (error) {
-    //   console.error('Error fetching policies:', error);
-    // }
-  };
-
-  const handleCreatePolicy = async (policy) => {
+  const handleAssignPolicies = async (assignments) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/policies`, {
+      await fetch(`http://localhost:8080/api/policies/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           subjectId: user.id,
-          ...policy
+          assignments
         }),
       });
-
-      if (response.ok) {
-        await fetchPolicies();
-        setPolicyDialogOpen(false);
-      }
+      setPolicyDialogOpen(false);
     } catch (error) {
-      console.error('Error creating policy:', error);
+      console.error('Error assigning policies:', error);
     }
   };
 
@@ -135,16 +123,16 @@ const SubjectPage = () => {
       padding: 0
     }}>
       <Box sx={{ maxWidth: '1200px', margin: '0 auto', p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4">My Personal Data Overview</Typography>
           <Button
             variant="contained"
             startIcon={<Security />}
             onClick={() => setPolicyDialogOpen(true)}
           >
-            Create New Policy
+            Manage Policy Groups
           </Button>
-        </Stack>
+        </Box>
 
         {Object.entries(data).map(([source, properties]) => (
           <Accordion key={source} defaultExpanded sx={{ mb: 2 }}>
@@ -169,7 +157,7 @@ const SubjectPage = () => {
                         <TableRow>
                           <TableCell width="200px">Property</TableCell>
                           <TableCell>Value</TableCell>
-                          <TableCell align="right" width="100px">Policies</TableCell>
+                          <TableCell align="right" width="100px">Applied Policy</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -178,7 +166,7 @@ const SubjectPage = () => {
                             <TableCell>{property}</TableCell>
                             <TableCell>{value}</TableCell>
                             <TableCell align="right">
-                              <Tooltip title="View Active Policies">
+                              <Tooltip title="View Applied Policy">
                                 <IconButton size="small">
                                   <Lock color={
                                     policies.some(p => 
@@ -202,14 +190,14 @@ const SubjectPage = () => {
         <Dialog
           open={policyDialogOpen}
           onClose={() => setPolicyDialogOpen(false)}
-          maxWidth="md"
+          maxWidth="lg"
           fullWidth
         >
-          <DialogTitle>Create New Policy</DialogTitle>
+          <DialogTitle>Manage Data Policies</DialogTitle>
           <DialogContent>
-            <PolicyCreator 
+            <PolicyGroupsManager
               data={data}
-              onPolicyCreate={handleCreatePolicy}
+              onAssignPolicies={handleAssignPolicies}
             />
           </DialogContent>
         </Dialog>
