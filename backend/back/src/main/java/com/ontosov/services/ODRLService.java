@@ -274,6 +274,53 @@ public class ODRLService {
             dataset.end();
         }
     }
+
+    public void cleanupPoliciesForGroup(String groupId, Long subjectId) {
+        dataset.begin(ReadWrite.WRITE);
+
+        try {
+            // Only select policies related to this group
+            String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
+                    "PREFIX odrl: <" + ODRL_NS + ">\n" +
+                    "PREFIX rdf: <" + RDF.getURI() + ">\n" +
+                    "SELECT ?policy ?permission\n" +
+                    "WHERE {\n" +
+                    "  ?policy rdf:type odrl:Policy ;\n" +
+                    "          onto:policyGroup onto:" + groupId + " ;\n" +
+                    "          odrl:permission ?permission .\n" +
+                    "}";
+
+            List<Resource> policiesToRemove = new ArrayList<>();
+            List<Resource> permissionsToRemove = new ArrayList<>();
+
+            Query query = QueryFactory.create(queryString);
+            try (QueryExecution qexec = QueryExecutionFactory.create(query, odrlModel)) {
+                ResultSet rs = qexec.execSelect();
+                while (rs.hasNext()) {
+                    QuerySolution solution = rs.next();
+                    policiesToRemove.add(solution.getResource("policy"));
+                    permissionsToRemove.add(solution.getResource("permission"));
+                }
+            }
+
+            // Remove the policies and permissions, but NOT the targets
+            // since targets could be used by other policy groups
+            for (Resource policy : policiesToRemove) {
+                odrlModel.removeAll(policy, null, null);
+            }
+
+            for (Resource permission : permissionsToRemove) {
+                odrlModel.removeAll(permission, null, null);
+            }
+
+            dataset.commit();
+        } catch (Exception e) {
+            dataset.abort();
+            throw new RuntimeException("Failed to cleanup ODRL policies: " + e.getMessage(), e);
+        } finally {
+            dataset.end();
+        }
+    }
     public Map<String, Map<String, Map<String, Set<String>>>> getSubjectPolicies(Long subjectId) {
         Map<String, Map<String, Map<String, Set<String>>>> result = new HashMap<>();
         dataset.begin(ReadWrite.READ);
