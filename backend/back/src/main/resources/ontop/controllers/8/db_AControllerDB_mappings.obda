@@ -13,8 +13,8 @@ target  :Resource/{user_id} a schema:Person ; schema:taxID {tax_id} ; schema:giv
 source  SELECT user_id, tax_id, name FROM user_profiles
 
 mappingId products_mapping
-target  :Resource/{product_id} a schema:Product ; schema:category {category} ; schema:model {name} .
-source  SELECT product_id, category, name FROM products
+target  :Resource/{product_id} a schema:Product ; schema:category {category} .
+source  SELECT product_id, category FROM products
 
 mappingId order_history_user_profiles_rel
 target  :Resource/{order_id} schema:customer :Resource/{user_id} .

@@ -6,6 +6,7 @@ import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
 import org.apache.jena.tdb2.TDB2Factory;
 import org.apache.jena.vocabulary.RDF;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,8 @@ public class PolicyGroupService {
     private final Property createdProperty;
     private final Property modifiedProperty;
     private final Resource policyGroupClass;
+    @Autowired
+    private ODRLService odrlService;
 
     @Value("${ontosov.triplestore.path}")
     private String triplestorePath;
@@ -321,10 +324,22 @@ public class PolicyGroupService {
                 throw new IllegalArgumentException("Policy group not found or access denied");
             }
 
+            // Remove all data assignments for this group
+            Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
+            StmtIterator assignmentIterator = policyModel.listStatements(policyGroup, hasDataAssignmentProperty, (RDFNode)null);
+            while (assignmentIterator.hasNext()) {
+                Statement stmt = assignmentIterator.next();
+                Resource assignment = stmt.getObject().asResource();
+                policyModel.removeAll(assignment, null, null); // Remove all statements about this assignment
+            }
+
             // Remove all statements about this policy group
             policyModel.removeAll(policyGroup, null, null);
 
             dataset.commit();
+
+            // Also tell the ODRLService to clean up related ODRL policies
+            odrlService.cleanupPoliciesForGroup(groupId, subjectId);
         } catch (Exception e) {
             dataset.abort();
             throw new RuntimeException("Failed to delete policy group: " + e.getMessage(), e);
