@@ -214,6 +214,8 @@ const SubjectPage = () => {
             groupName: policyGroup.name,
             actions: sourceMap[source][property],
             constraints: policyGroup.constraints,
+            consequences: policyGroup.consequences,
+            aiRestrictions: policyGroup.aiRestrictions,
           });
         } else {
           policies.push({

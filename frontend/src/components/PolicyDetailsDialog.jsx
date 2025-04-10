@@ -19,13 +19,52 @@ import {
   Lock,
   CalendarToday,
   Description,
-  Notifications
+  Notifications,
+  AttachMoney,
+  Storage,
+  Psychology
 } from '@mui/icons-material';
 
 // Helper function to format action name
 const formatActionName = (action) => {
+  // Skip metadata actions that start with __
+  if (action.startsWith('__')) {
+    return null;
+  }
+  
+  // Handle prohibition actions
+  if (action.startsWith('prohibit-')) {
+    const actionName = action.replace('prohibit-', '');
+    // Handle the aiTraining special case
+    if (actionName === 'aiTraining') {
+      return 'Prohibited: AI Training';
+    }
+    return `Prohibited: ${actionName.charAt(0).toUpperCase() + actionName.slice(1)}`;
+  }
+  
+  // Handle the aiTraining special case
+  if (action === 'aiTraining') {
+    return 'AI Training';
+  }
+  
   return action.charAt(0).toUpperCase() + action.slice(1);
 };
+
+const formatAlgorithmName = (algorithm) => {
+    switch (algorithm) {
+      case 'federatedLearning':
+        return 'Federated Learning';
+      case 'differentialPrivacy':
+        return 'Differential Privacy';
+      case 'secureEnclave':
+        return 'Secure Enclave Processing';
+      case 'localProcessing':
+        return 'Local Processing Only';
+      default:
+        return algorithm; // Return as-is if not recognized
+    }
+};
+    
 
 const PolicyDetailsDialog = ({ open, onClose, details }) => {
   if (!details) return null;
@@ -81,27 +120,37 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
             
             <Box sx={{ mb: 2 }}>
               {Array.isArray(policy.actions) ? (
-                policy.actions.map(action => (
-                  <Chip
-                    key={action}
-                    label={formatActionName(action)}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    sx={{ mr: 1, mb: 1 }}
-                  />
-                ))
+                policy.actions
+                  .filter(action => !action.startsWith('__')) // Filter out metadata actions
+                  .map(action => {
+                    const formattedAction = formatActionName(action);
+                    return formattedAction ? (
+                      <Chip
+                        key={action}
+                        label={formattedAction}
+                        size="small"
+                        color={action.startsWith('prohibit-') ? "error" : "primary"}
+                        variant="outlined"
+                        sx={{ mr: 1, mb: 1 }}
+                      />
+                    ) : null;
+                  })
               ) : (
-                Object.keys(policy.actions).map(action => (
-                  <Chip
-                    key={action}
-                    label={formatActionName(action)}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    sx={{ mr: 1, mb: 1 }}
-                  />
-                ))
+                Object.keys(policy.actions)
+                  .filter(action => !action.startsWith('__'))
+                  .map(action => {
+                    const formattedAction = formatActionName(action);
+                    return formattedAction ? (
+                      <Chip
+                        key={action}
+                        label={formattedAction}
+                        size="small"
+                        color={action.startsWith('prohibit-') ? "error" : "primary"}
+                        variant="outlined"
+                        sx={{ mr: 1, mb: 1 }}
+                      />
+                    ) : null;
+                  })
               )}
             </Box>
 
@@ -132,14 +181,75 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                       />
                     </ListItem>
                   )}
-                  
-                  {policy.constraints.requiresNotification && (
+                </List>
+              </Box>
+            )}
+            
+            {/* Display consequences if present */}
+            {policy.consequences && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Consequences for Violations
+                </Typography>
+                <List dense disablePadding>
+                  {policy.consequences.notificationType && (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
                         <Notifications fontSize="small" />
                       </ListItemIcon>
                       <ListItemText 
-                        primary="Notifications enabled"
+                        primary={`Notification via: ${policy.consequences.notificationType}`}
+                      />
+                    </ListItem>
+                  )}
+                  
+                  {policy.consequences.compensationAmount && (
+                    <ListItem disablePadding>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <AttachMoney fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={`Compensation: €${policy.consequences.compensationAmount}`}
+                      />
+                    </ListItem>
+                  )}
+                </List>
+              </Box>
+            )}
+            
+            {/* Display AI restrictions if present */}
+            {policy.aiRestrictions && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  AI Training Restrictions
+                </Typography>
+                <List dense disablePadding>
+                  {policy.aiRestrictions.allowAiTraining === false ? (
+                    <ListItem disablePadding>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <Psychology fontSize="small" color="error" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="AI training prohibited"
+                        primaryTypographyProps={{ color: 'error' }}
+                      />
+                    </ListItem>
+                  ) : policy.aiRestrictions.aiAlgorithm ? (
+                    <ListItem disablePadding>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <Psychology fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={`Allowed algorithm: ${formatAlgorithmName(policy.aiRestrictions.aiAlgorithm)}`}
+                      />
+                    </ListItem>
+                  ) : (
+                    <ListItem disablePadding>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <Psychology fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary="AI training allowed with no restrictions"
                       />
                     </ListItem>
                   )}

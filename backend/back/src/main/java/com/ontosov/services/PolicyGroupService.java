@@ -23,6 +23,8 @@ public class PolicyGroupService {
 
     private final Dataset dataset;
     private final Model policyModel;
+
+    // Basic properties
     private final Property nameProperty;
     private final Property descriptionProperty;
     private final Property ownerProperty;
@@ -34,11 +36,19 @@ public class PolicyGroupService {
     private final Property createdProperty;
     private final Property modifiedProperty;
     private final Resource policyGroupClass;
+
+    // Consequence properties
+    private final Property consequenceProperty;
+    private final Property notificationTypeProperty;
+    private final Property compensationAmountProperty;
+
+    // AI restriction properties
+    private final Property aiRestrictionsProperty;
+    private final Property allowAiTrainingProperty;
+    private final Property aiAlgorithmProperty;
+
     @Autowired
     private ODRLService odrlService;
-
-    @Value("${ontosov.triplestore.path}")
-    private String triplestorePath;
 
     public PolicyGroupService(@Value("${ontosov.triplestore.path:src/main/resources/triplestore}") String triplestorePath) {
         // Create directory if it doesn't exist
@@ -51,7 +61,7 @@ public class PolicyGroupService {
         this.dataset = TDB2Factory.connectDataset(triplestorePath);
         this.policyModel = dataset.getNamedModel(ONTOSOV_NS + "policies");
 
-        // Define properties
+        // Define basic properties
         this.nameProperty = policyModel.createProperty(ONTOSOV_NS, "name");
         this.descriptionProperty = policyModel.createProperty(ONTOSOV_NS, "description");
         this.ownerProperty = policyModel.createProperty(ONTOSOV_NS, "owner");
@@ -63,6 +73,16 @@ public class PolicyGroupService {
         this.createdProperty = policyModel.createProperty(ONTOSOV_NS, "created");
         this.modifiedProperty = policyModel.createProperty(ONTOSOV_NS, "modified");
         this.policyGroupClass = policyModel.createResource(ONTOSOV_NS + "PolicyGroup");
+
+        // Define consequence properties
+        this.consequenceProperty = policyModel.createProperty(ONTOSOV_NS, "consequence");
+        this.notificationTypeProperty = policyModel.createProperty(ONTOSOV_NS, "notificationType");
+        this.compensationAmountProperty = policyModel.createProperty(ONTOSOV_NS, "compensationAmount");
+
+        // Define AI restriction properties
+        this.aiRestrictionsProperty = policyModel.createProperty(ONTOSOV_NS, "aiRestrictions");
+        this.allowAiTrainingProperty = policyModel.createProperty(ONTOSOV_NS, "allowAiTraining");
+        this.aiAlgorithmProperty = policyModel.createProperty(ONTOSOV_NS, "aiAlgorithm");
     }
 
     public String createPolicyGroup(PolicyGroupDTO policyGroupDTO, Long subjectId) {
@@ -118,6 +138,51 @@ public class PolicyGroupService {
                 }
 
                 policyGroup.addProperty(constraintProperty, constraint);
+            }
+
+            // Add consequences
+            if (policyGroupDTO.getConsequences() != null && !policyGroupDTO.getConsequences().isEmpty()) {
+                Resource consequence = policyModel.createResource();
+
+                // Notification type
+                if (policyGroupDTO.getConsequences().containsKey("notificationType") &&
+                        policyGroupDTO.getConsequences().get("notificationType") != null &&
+                        !policyGroupDTO.getConsequences().get("notificationType").toString().isEmpty()) {
+                    consequence.addProperty(notificationTypeProperty,
+                            policyGroupDTO.getConsequences().get("notificationType").toString());
+                }
+
+                // Compensation amount
+                if (policyGroupDTO.getConsequences().containsKey("compensationAmount") &&
+                        policyGroupDTO.getConsequences().get("compensationAmount") != null &&
+                        !policyGroupDTO.getConsequences().get("compensationAmount").toString().isEmpty()) {
+                    consequence.addProperty(compensationAmountProperty,
+                            policyGroupDTO.getConsequences().get("compensationAmount").toString());
+                }
+
+                policyGroup.addProperty(consequenceProperty, consequence);
+            }
+
+            // Add AI restrictions
+            if (policyGroupDTO.getAiRestrictions() != null && !policyGroupDTO.getAiRestrictions().isEmpty()) {
+                Resource aiRestriction = policyModel.createResource();
+
+                // Allow AI training flag
+                if (policyGroupDTO.getAiRestrictions().containsKey("allowAiTraining")) {
+                    boolean allowAiTraining = Boolean.TRUE.equals(
+                            policyGroupDTO.getAiRestrictions().get("allowAiTraining"));
+                    aiRestriction.addProperty(allowAiTrainingProperty, String.valueOf(allowAiTraining));
+                }
+
+                // AI algorithm specification
+                if (policyGroupDTO.getAiRestrictions().containsKey("aiAlgorithm") &&
+                        policyGroupDTO.getAiRestrictions().get("aiAlgorithm") != null &&
+                        !policyGroupDTO.getAiRestrictions().get("aiAlgorithm").toString().isEmpty()) {
+                    aiRestriction.addProperty(aiAlgorithmProperty,
+                            policyGroupDTO.getAiRestrictions().get("aiAlgorithm").toString());
+                }
+
+                policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
             }
 
             dataset.commit();
@@ -230,6 +295,68 @@ public class PolicyGroupService {
                     }
 
                     dto.setConstraints(constraints);
+
+                    // Get consequences
+                    Map<String, Object> consequences = new HashMap<>();
+
+                    StmtIterator consequenceIterator = policyModel.listStatements(
+                            groupResource,
+                            consequenceProperty,
+                            (RDFNode) null
+                    );
+
+                    if (consequenceIterator.hasNext()) {
+                        Resource consequenceResource = consequenceIterator.next().getObject().asResource();
+
+                        // Notification type
+                        Statement notificationTypeStmt = consequenceResource.getProperty(notificationTypeProperty);
+                        if (notificationTypeStmt != null) {
+                            consequences.put("notificationType", notificationTypeStmt.getString());
+                        }
+
+                        // Compensation amount
+                        Statement compensationAmountStmt = consequenceResource.getProperty(compensationAmountProperty);
+                        if (compensationAmountStmt != null) {
+                            consequences.put("compensationAmount", compensationAmountStmt.getString());
+                        }
+                    }
+
+                    dto.setConsequences(consequences);
+
+                    // Get AI restrictions
+                    Map<String, Object> aiRestrictions = new HashMap<>();
+
+                    StmtIterator aiRestrictionsIterator = policyModel.listStatements(
+                            groupResource,
+                            aiRestrictionsProperty,
+                            (RDFNode) null
+                    );
+
+                    if (aiRestrictionsIterator.hasNext()) {
+                        Resource aiRestrictionResource = aiRestrictionsIterator.next().getObject().asResource();
+
+                        // AI training flag
+                        Statement allowAiTrainingStmt = aiRestrictionResource.getProperty(allowAiTrainingProperty);
+                        if (allowAiTrainingStmt != null) {
+                            aiRestrictions.put("allowAiTraining", Boolean.parseBoolean(allowAiTrainingStmt.getString()));
+                        } else {
+                            // Default to true if not specified
+                            aiRestrictions.put("allowAiTraining", true);
+                        }
+
+                        // AI algorithm
+                        Statement aiAlgorithmStmt = aiRestrictionResource.getProperty(aiAlgorithmProperty);
+                        if (aiAlgorithmStmt != null) {
+                            aiRestrictions.put("aiAlgorithm", aiAlgorithmStmt.getString());
+                        }
+                    } else {
+                        // Default values if no AI restrictions specified
+                        aiRestrictions.put("allowAiTraining", true);
+                        aiRestrictions.put("aiAlgorithm", "");
+                    }
+
+                    dto.setAiRestrictions(aiRestrictions);
+
                     result.add(dto);
                 }
             }
@@ -301,6 +428,57 @@ public class PolicyGroupService {
                 }
 
                 policyGroup.addProperty(constraintProperty, constraint);
+            }
+
+            // Remove old consequences
+            policyGroup.removeAll(consequenceProperty);
+
+            // Add new consequences
+            if (policyGroupDTO.getConsequences() != null && !policyGroupDTO.getConsequences().isEmpty()) {
+                Resource consequence = policyModel.createResource();
+
+                // Notification type
+                if (policyGroupDTO.getConsequences().containsKey("notificationType") &&
+                        policyGroupDTO.getConsequences().get("notificationType") != null &&
+                        !policyGroupDTO.getConsequences().get("notificationType").toString().isEmpty()) {
+                    consequence.addProperty(notificationTypeProperty,
+                            policyGroupDTO.getConsequences().get("notificationType").toString());
+                }
+
+                // Compensation amount
+                if (policyGroupDTO.getConsequences().containsKey("compensationAmount") &&
+                        policyGroupDTO.getConsequences().get("compensationAmount") != null &&
+                        !policyGroupDTO.getConsequences().get("compensationAmount").toString().isEmpty()) {
+                    consequence.addProperty(compensationAmountProperty,
+                            policyGroupDTO.getConsequences().get("compensationAmount").toString());
+                }
+
+                policyGroup.addProperty(consequenceProperty, consequence);
+            }
+
+            // Remove old AI restrictions
+            policyGroup.removeAll(aiRestrictionsProperty);
+
+            // Add new AI restrictions
+            if (policyGroupDTO.getAiRestrictions() != null && !policyGroupDTO.getAiRestrictions().isEmpty()) {
+                Resource aiRestriction = policyModel.createResource();
+
+                // Allow AI training flag
+                if (policyGroupDTO.getAiRestrictions().containsKey("allowAiTraining")) {
+                    boolean allowAiTraining = Boolean.TRUE.equals(
+                            policyGroupDTO.getAiRestrictions().get("allowAiTraining"));
+                    aiRestriction.addProperty(allowAiTrainingProperty, String.valueOf(allowAiTraining));
+                }
+
+                // AI algorithm specification
+                if (policyGroupDTO.getAiRestrictions().containsKey("aiAlgorithm") &&
+                        policyGroupDTO.getAiRestrictions().get("aiAlgorithm") != null &&
+                        !policyGroupDTO.getAiRestrictions().get("aiAlgorithm").toString().isEmpty()) {
+                    aiRestriction.addProperty(aiAlgorithmProperty,
+                            policyGroupDTO.getAiRestrictions().get("aiAlgorithm").toString());
+                }
+
+                policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
             }
 
             dataset.commit();
