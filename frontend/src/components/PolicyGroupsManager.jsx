@@ -283,7 +283,7 @@ const PolicyGroupForm = React.memo(
         >
           <Button onClick={onCancel}>Cancel</Button>
           <Button variant="contained" onClick={onSave}>
-            {formState.id ? "Save Changes" : "Create Group"}
+            {formState.id ? "Save Changes" : "Create Policy"}
           </Button>
         </Box>
       </Box>
@@ -409,7 +409,7 @@ const AssignPolicyForm = React.memo(({ data, onSave, onCancel, groupName, initia
           onClick={handleSave}
           disabled={Object.keys(selectedData).length === 0}
         >
-          Apply Policy Group
+          Apply Policies
         </Button>
       </Box>
     </Box>
@@ -508,7 +508,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
       const response = await fetch(
         `http://localhost:8080/api/policy-groups/${userId}`
       );
-      if (!response.ok) throw new Error("Failed to fetch policy groups");
+      if (!response.ok) throw new Error("Failed to fetch policies");
       const data = await response.json();
       setPolicyGroups(data);
     } catch (err) {
@@ -551,14 +551,14 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to create policy group");
+      if (!response.ok) throw new Error("Failed to create policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group created successfully",
+        message: "Policy created successfully",
         severity: "success",
       });
       setCreateDialogOpen(false);
@@ -593,14 +593,14 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to update policy group");
+      if (!response.ok) throw new Error("Failed to update policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group updated successfully",
+        message: "Policy updated successfully",
         severity: "success",
       });
       setCreateDialogOpen(false);
@@ -632,14 +632,14 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to delete policy group");
+      if (!response.ok) throw new Error("Failed to delete policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group deleted successfully",
+        message: "Policy deleted successfully",
         severity: "success",
       });
     } catch (err) {
@@ -780,7 +780,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
       )}
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h5">Policy Groups</Typography>
+        <Typography variant="h5">Policies</Typography>
         <Box>
           <Button
             variant="outlined"
@@ -797,14 +797,14 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
               setCreateDialogOpen(true);
             }}
           >
-            Create Policy Group
+            Create Policy
           </Button>
         </Box>
       </Box>
 
       {policyGroups.length === 0 && !loading ? (
         <Alert severity="info">
-          No policy groups found. Create your first policy group to manage data
+          No policies found. Create your first policy to manage data
           access.
         </Alert>
       ) : (
@@ -884,7 +884,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
         fullWidth
       >
         <DialogTitle>
-          {formState.id ? "Edit Policy Group" : "Create Policy Group"}
+          {formState.id ? "Edit Policy" : "Create Policy"}
         </DialogTitle>
         <DialogContent>
           <PolicyGroupForm

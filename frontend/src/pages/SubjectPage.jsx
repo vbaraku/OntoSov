@@ -163,7 +163,7 @@ const SubjectPage = () => {
         setPolicyGroups(data);
       }
     } catch (err) {
-      console.error("Error fetching policy groups:", err);
+      console.error("Error fetching policies:", err);
     }
   };
 
@@ -399,7 +399,7 @@ const SubjectPage = () => {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                 }}
               >
-                Manage Policy Groups
+                Manage Policies
               </Button>
             </Grid>
           </Grid>

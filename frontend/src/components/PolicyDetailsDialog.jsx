@@ -103,7 +103,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
         </Paper>
 
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Applied Policy Groups
+          Applied Policies
         </Typography>
 
         {details.policies.map((policy, index) => (
