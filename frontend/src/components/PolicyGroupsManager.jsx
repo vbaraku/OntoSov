@@ -478,7 +478,7 @@ const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
   );
 };
 
-const PolicyGroupsManager = ({ data, userId }) => {
+const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
   const [policyGroups, setPolicyGroups] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -677,7 +677,40 @@ const PolicyGroupsManager = ({ data, userId }) => {
       
       if (response.ok) {
         const currentAssignments = await response.json();
-        setSelectedData(currentAssignments);
+        
+        // If we have initialSelectedData, merge it with current assignments
+        if (initialSelectedData) {
+          // Convert initialSelectedData to the format expected by the component
+          const formattedInitialData = {};
+          
+          Object.entries(initialSelectedData).forEach(([source, properties]) => {
+            if (Array.isArray(properties)) {
+              formattedInitialData[source] = new Set(properties);
+            } else {
+              formattedInitialData[source] = new Set([properties]);
+            }
+          });
+          
+          // Merge with current assignments
+          const mergedData = { ...currentAssignments };
+          
+          Object.entries(formattedInitialData).forEach(([source, properties]) => {
+            if (!mergedData[source]) {
+              mergedData[source] = new Set();
+            } else if (!(mergedData[source] instanceof Set)) {
+              // Convert to Set if it's not already
+              mergedData[source] = new Set(Array.isArray(mergedData[source]) ? 
+                mergedData[source] : Object.keys(mergedData[source]));
+            }
+            
+            // Add each property
+            properties.forEach(prop => mergedData[source].add(prop));
+          });
+          
+          setSelectedData(mergedData);
+        } else {
+          setSelectedData(currentAssignments);
+        }
       }
     } catch (error) {
       console.error("Error fetching assignments:", error);

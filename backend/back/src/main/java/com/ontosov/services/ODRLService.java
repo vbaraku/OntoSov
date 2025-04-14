@@ -600,7 +600,6 @@ public class ODRLService {
                     // that will be interpreted by the UI
 
                     // Add a special action with metadata about this policy group that the UI can use
-                    // This is a hack, but it allows us to pass this information to the UI
                     for (Map<String, Map<String, Set<String>>> sourceMap : result.values()) {
                         for (Map<String, Set<String>> propertyMap : sourceMap.values()) {
                             for (Set<String> actions : propertyMap.values()) {
