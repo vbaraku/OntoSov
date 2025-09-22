@@ -107,6 +107,7 @@ const SubjectPage = () => {
   const [selectedPolicyDetails, setSelectedPolicyDetails] = useState(null);
   const [searchTerms, setSearchTerms] = useState({});
   const [filterTabs, setFilterTabs] = useState({});
+  const [selectedDataForPolicy, setSelectedDataForPolicy] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -162,7 +163,7 @@ const SubjectPage = () => {
         setPolicyGroups(data);
       }
     } catch (err) {
-      console.error("Error fetching policy groups:", err);
+      console.error("Error fetching policies:", err);
     }
   };
 
@@ -214,6 +215,8 @@ const SubjectPage = () => {
             groupName: policyGroup.name,
             actions: sourceMap[source][property],
             constraints: policyGroup.constraints,
+            consequences: policyGroup.consequences,
+            aiRestrictions: policyGroup.aiRestrictions,
           });
         } else {
           policies.push({
@@ -396,7 +399,7 @@ const SubjectPage = () => {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                 }}
               >
-                Manage Policy Groups
+                Manage Policies
               </Button>
             </Grid>
           </Grid>
@@ -660,18 +663,25 @@ const SubjectPage = () => {
                                       title={
                                         isProtected
                                           ? "Protected by policy - Click for details"
-                                          : "No policy applied"
+                                          : "No policy applied - Click to apply policies"
                                       }
                                     >
                                       <IconButton
                                         size="small"
-                                        onClick={() =>
-                                          isProtected &&
-                                          handleShowPolicyDetails(
-                                            source,
-                                            property
-                                          )
-                                        }
+                                        onClick={() => {
+                                          if (isProtected) {
+                                            handleShowPolicyDetails(
+                                              source,
+                                              property
+                                            );
+                                          } else {
+                                            setPolicyDialogOpen(true);
+                                            setSelectedDataForPolicy({
+                                              source: source,
+                                              property: property,
+                                            });
+                                          }
+                                        }}
                                       >
                                         {isProtected ? (
                                           <Lock
@@ -704,13 +714,28 @@ const SubjectPage = () => {
         {/* Policy management dialog */}
         <Dialog
           open={policyDialogOpen}
-          onClose={handlePolicyDialogClose}
+          onClose={() => {
+            handlePolicyDialogClose();
+            setSelectedDataForPolicy(null); // Reset selected data when closing
+          }}
           maxWidth="lg"
           fullWidth
         >
           <DialogTitle>Manage Data Policies</DialogTitle>
           <DialogContent>
-            <PolicyGroupsManager data={data} userId={user?.id} />
+            <PolicyGroupsManager
+              data={data}
+              userId={user?.id}
+              initialSelectedData={
+                selectedDataForPolicy
+                  ? {
+                      [selectedDataForPolicy.source]: [
+                        selectedDataForPolicy.property,
+                      ],
+                    }
+                  : undefined
+              }
+            />
           </DialogContent>
         </Dialog>
 

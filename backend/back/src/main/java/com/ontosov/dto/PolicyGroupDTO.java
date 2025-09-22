@@ -10,4 +10,6 @@ public class PolicyGroupDTO {
     private String description;
     private Map<String, Boolean> permissions;
     private Map<String, Object> constraints;
+    private Map<String, Object> consequences;
+    private Map<String, Object> aiRestrictions;
 }

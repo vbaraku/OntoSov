@@ -12,14 +12,23 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   List,
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
   Card,
+  CardContent,
+  CardActions,
   CircularProgress,
   Alert,
   Snackbar,
+  Grid,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  Chip,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -36,6 +45,8 @@ const tooltips = {
   modify: "Making updates or changes to the data",
   notification:
     "Receive notifications when your data is accessed according to allowed permissions",
+  allowAiTraining: "Allow your data to be used for training AI models",
+  aiAlgorithm: "Specify which AI algorithm can be used to process your data"
 };
 
 const initialFormState = {
@@ -52,6 +63,14 @@ const initialFormState = {
     purpose: "",
     expiration: null,
     requiresNotification: false,
+  },
+  consequences: {
+    notificationType: "email",
+    compensationAmount: "",
+  },
+  aiRestrictions: {
+    allowAiTraining: true,
+    aiAlgorithm: "",
   },
 };
 
@@ -137,7 +156,7 @@ const PolicyGroupForm = React.memo(
           />
         </FormControl>
 
-        <FormControl fullWidth sx={{ mb: 2 }}>
+        <FormControl fullWidth sx={{ mb: 3 }}>
           <DatePicker
             label="Expiration Date"
             value={formState.constraints.expiration}
@@ -158,37 +177,113 @@ const PolicyGroupForm = React.memo(
           />
         </FormControl>
 
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Typography variant="h6" gutterBottom>
+          Consequences
+        </Typography>
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Notification Type</InputLabel>
+          <Select
+            value={formState.consequences.notificationType}
+            label="Notification Type"
+            onChange={(e) =>
+              setFormState((prev) => ({
+                ...prev,
+                consequences: {
+                  ...prev.consequences,
+                  notificationType: e.target.value,
+                },
+              }))
+            }
+          >
+            <MenuItem value="email">Email</MenuItem>
+          </Select>
+          <FormHelperText>How you'll be notified of policy violations</FormHelperText>
+        </FormControl>
+
+        <FormControl fullWidth sx={{ mb: 3 }}>
+          <TextField
+            label="Compensation Amount"
+            type="number"
+            value={formState.consequences.compensationAmount}
+            onChange={(e) =>
+              setFormState((prev) => ({
+                ...prev,
+                consequences: {
+                  ...prev.consequences,
+                  compensationAmount: e.target.value,
+                },
+              }))
+            }
+            placeholder="e.g., 100"
+            InputProps={{ startAdornment: "€" }}
+            helperText="Monetary compensation in case of data misuse (optional)"
+          />
+        </FormControl>
+
+        <Typography variant="h6" gutterBottom>
+          AI Training Restrictions
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
           <FormControlLabel
             control={
               <Checkbox
-                checked={formState.constraints.requiresNotification}
+                checked={formState.aiRestrictions.allowAiTraining}
                 onChange={(e) =>
                   setFormState((prev) => ({
                     ...prev,
-                    constraints: {
-                      ...prev.constraints,
-                      requiresNotification: e.target.checked,
+                    aiRestrictions: {
+                      ...prev.aiRestrictions,
+                      allowAiTraining: e.target.checked,
                     },
                   }))
                 }
               />
             }
-            label="Notify me when data is accessed"
+            label="Allow AI training on this data"
           />
-          <Tooltip title={tooltips.notification} arrow>
+          <Tooltip title={tooltips.allowAiTraining} arrow>
             <IconButton size="small">
               <HelpOutlineIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
+        
+        {formState.aiRestrictions.allowAiTraining && (
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel>Allowed AI Algorithm</InputLabel>
+            <Select
+              value={formState.aiRestrictions.aiAlgorithm}
+              label="Allowed AI Algorithm"
+              onChange={(e) =>
+                setFormState((prev) => ({
+                  ...prev,
+                  aiRestrictions: {
+                    ...prev.aiRestrictions,
+                    aiAlgorithm: e.target.value,
+                  },
+                }))
+              }
+            >
+              <MenuItem value="">
+                <em>Any algorithm</em>
+              </MenuItem>
+              <MenuItem value="federatedLearning">Federated Learning Only</MenuItem>
+              <MenuItem value="differentialPrivacy">Differential Privacy</MenuItem>
+              <MenuItem value="secureEnclave">Secure Enclave Processing</MenuItem>
+              <MenuItem value="localProcessing">Local Processing Only</MenuItem>
+            </Select>
+            <FormHelperText>
+              Restrict which AI training algorithms can be used
+            </FormHelperText>
+          </FormControl>
+        )}
 
         <Box
           sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}
         >
           <Button onClick={onCancel}>Cancel</Button>
           <Button variant="contained" onClick={onSave}>
-            {formState.id ? "Save Changes" : "Create Group"}
+            {formState.id ? "Save Changes" : "Create Policy"}
           </Button>
         </Box>
       </Box>
@@ -314,18 +409,82 @@ const AssignPolicyForm = React.memo(({ data, onSave, onCancel, groupName, initia
           onClick={handleSave}
           disabled={Object.keys(selectedData).length === 0}
         >
-          Apply Policy Group
+          Apply Policies
         </Button>
       </Box>
     </Box>
   );
 });
 
-const PolicyGroupsManager = ({ data, userId }) => {
+// Template selection dialog component
+const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Select Privacy Tier Template</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Choose a privacy tier template based on how sensitive you consider your data.
+          You can customize it further after selection.
+        </Typography>
+        <Grid container spacing={2}>
+          {templates.map((template, index) => (
+            <Grid item xs={12} md={6} key={index}>
+              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" gutterBottom>
+                    {template.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    {template.description}
+                  </Typography>
+                  <Typography variant="subtitle2" gutterBottom>Permissions:</Typography>
+                  <Box sx={{ mb: 1 }}>
+                    {Object.entries(template.permissions)
+                      .filter(([_, value]) => value)
+                      .map(([key]) => (
+                        <Chip 
+                          key={key} 
+                          label={key.charAt(0).toUpperCase() + key.slice(1)} 
+                          size="small" 
+                          sx={{ mr: 0.5, mb: 0.5 }} 
+                        />
+                      ))}
+                  </Box>
+                  
+                  {template.aiRestrictions?.allowAiTraining === false && (
+                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                      AI Training: Not Allowed
+                    </Typography>
+                  )}
+                </CardContent>
+                <CardActions>
+                  <Button 
+                    fullWidth 
+                    variant="outlined" 
+                    onClick={() => onSelect(template)}
+                  >
+                    Use Template
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
   const [policyGroups, setPolicyGroups] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -339,6 +498,7 @@ const PolicyGroupsManager = ({ data, userId }) => {
   useEffect(() => {
     if (userId) {
       fetchPolicyGroups();
+      fetchTemplates();
     }
   }, [userId]);
 
@@ -348,7 +508,7 @@ const PolicyGroupsManager = ({ data, userId }) => {
       const response = await fetch(
         `http://localhost:8080/api/policy-groups/${userId}`
       );
-      if (!response.ok) throw new Error("Failed to fetch policy groups");
+      if (!response.ok) throw new Error("Failed to fetch policies");
       const data = await response.json();
       setPolicyGroups(data);
     } catch (err) {
@@ -360,6 +520,20 @@ const PolicyGroupsManager = ({ data, userId }) => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:8080/api/policy-groups/templates"
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data);
+      }
+    } catch (error) {
+      console.error("Error fetching templates:", error);
     }
   };
 
@@ -377,14 +551,14 @@ const PolicyGroupsManager = ({ data, userId }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to create policy group");
+      if (!response.ok) throw new Error("Failed to create policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group created successfully",
+        message: "Policy created successfully",
         severity: "success",
       });
       setCreateDialogOpen(false);
@@ -419,14 +593,14 @@ const PolicyGroupsManager = ({ data, userId }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to update policy group");
+      if (!response.ok) throw new Error("Failed to update policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group updated successfully",
+        message: "Policy updated successfully",
         severity: "success",
       });
       setCreateDialogOpen(false);
@@ -458,14 +632,14 @@ const PolicyGroupsManager = ({ data, userId }) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to delete policy group");
+      if (!response.ok) throw new Error("Failed to delete policy");
 
       // Refresh groups list
       await fetchPolicyGroups();
 
       setSnackbar({
         open: true,
-        message: "Policy group deleted successfully",
+        message: "Policy deleted successfully",
         severity: "success",
       });
     } catch (err) {
@@ -503,7 +677,40 @@ const PolicyGroupsManager = ({ data, userId }) => {
       
       if (response.ok) {
         const currentAssignments = await response.json();
-        setSelectedData(currentAssignments);
+        
+        // If we have initialSelectedData, merge it with current assignments
+        if (initialSelectedData) {
+          // Convert initialSelectedData to the format expected by the component
+          const formattedInitialData = {};
+          
+          Object.entries(initialSelectedData).forEach(([source, properties]) => {
+            if (Array.isArray(properties)) {
+              formattedInitialData[source] = new Set(properties);
+            } else {
+              formattedInitialData[source] = new Set([properties]);
+            }
+          });
+          
+          // Merge with current assignments
+          const mergedData = { ...currentAssignments };
+          
+          Object.entries(formattedInitialData).forEach(([source, properties]) => {
+            if (!mergedData[source]) {
+              mergedData[source] = new Set();
+            } else if (!(mergedData[source] instanceof Set)) {
+              // Convert to Set if it's not already
+              mergedData[source] = new Set(Array.isArray(mergedData[source]) ? 
+                mergedData[source] : Object.keys(mergedData[source]));
+            }
+            
+            // Add each property
+            properties.forEach(prop => mergedData[source].add(prop));
+          });
+          
+          setSelectedData(mergedData);
+        } else {
+          setSelectedData(currentAssignments);
+        }
       }
     } catch (error) {
       console.error("Error fetching assignments:", error);
@@ -573,22 +780,31 @@ const PolicyGroupsManager = ({ data, userId }) => {
       )}
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h5">Policy Groups</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setFormState(initialFormState);
-            setCreateDialogOpen(true);
-          }}
-        >
-          Create Policy Group
-        </Button>
+        <Typography variant="h5">Policies</Typography>
+        <Box>
+          <Button
+            variant="outlined"
+            onClick={() => setTemplateDialogOpen(true)}
+            sx={{ mr: 1 }}
+          >
+            Use Template
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setFormState(initialFormState);
+              setCreateDialogOpen(true);
+            }}
+          >
+            Create Policy
+          </Button>
+        </Box>
       </Box>
 
       {policyGroups.length === 0 && !loading ? (
         <Alert severity="info">
-          No policy groups found. Create your first policy group to manage data
+          No policies found. Create your first policy to manage data
           access.
         </Alert>
       ) : (
@@ -605,7 +821,37 @@ const PolicyGroupsManager = ({ data, userId }) => {
             >
               <ListItemText
                 primary={group.name}
-                secondary={group.description}
+                secondary={
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {group.description}
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {/* Display permissions as badges */}
+                      {Object.entries(group.permissions)
+                        .filter(([_, value]) => value)
+                        .map(([key]) => (
+                          <Chip 
+                            key={key} 
+                            label={key.charAt(0).toUpperCase() + key.slice(1)} 
+                            size="small" 
+                            color="primary"
+                            variant="outlined"
+                          />
+                        ))}
+                      
+                      {/* Display AI training restriction if present */}
+                      {group.aiRestrictions?.allowAiTraining === false && (
+                        <Chip 
+                          label="No AI Training" 
+                          size="small" 
+                          color="error"
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
+                  </Box>
+                }
               />
               <ListItemSecondaryAction>
                 <IconButton onClick={() => handleEditGroup(group)}>
@@ -638,7 +884,7 @@ const PolicyGroupsManager = ({ data, userId }) => {
         fullWidth
       >
         <DialogTitle>
-          {formState.id ? "Edit Policy Group" : "Create Policy Group"}
+          {formState.id ? "Edit Policy" : "Create Policy"}
         </DialogTitle>
         <DialogContent>
           <PolicyGroupForm
@@ -676,6 +922,17 @@ const PolicyGroupsManager = ({ data, userId }) => {
           />
         </DialogContent>
       </Dialog>
+      
+      <TemplateSelectionDialog
+        open={templateDialogOpen}
+        onClose={() => setTemplateDialogOpen(false)}
+        templates={templates}
+        onSelect={(template) => {
+          setFormState(template);
+          setTemplateDialogOpen(false);
+          setCreateDialogOpen(true);
+        }}
+      />
 
       <Snackbar
         open={snackbar.open}

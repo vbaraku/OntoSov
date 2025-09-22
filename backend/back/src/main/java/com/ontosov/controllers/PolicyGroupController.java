@@ -3,10 +3,10 @@ package com.ontosov.controllers;
 import com.ontosov.dto.PolicyAssignmentDTO;
 import com.ontosov.dto.PolicyGroupDTO;
 import com.ontosov.dto.PolicyStatusDTO;
-// No need for these imports
 
 import com.ontosov.services.ODRLService;
 import com.ontosov.services.PolicyGroupService;
+import com.ontosov.services.PolicyTemplateService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,11 +25,24 @@ public class PolicyGroupController {
     @Autowired
     private ODRLService odrlService;
 
+    @Autowired
+    private PolicyTemplateService policyTemplateService;
+
     @GetMapping("/{subjectId}")
     public ResponseEntity<List<PolicyGroupDTO>> getPolicyGroups(@PathVariable Long subjectId) {
         try {
             List<PolicyGroupDTO> groups = policyGroupService.getPolicyGroupsBySubject(subjectId);
             return ResponseEntity.ok(groups);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/templates")
+    public ResponseEntity<List<PolicyGroupDTO>> getPolicyTemplates() {
+        try {
+            List<PolicyGroupDTO> templates = policyTemplateService.getPrivacyTierTemplates();
+            return ResponseEntity.ok(templates);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
