@@ -2,6 +2,7 @@ package com.ontosov.services;
 
 import com.ontosov.dto.*;
 import org.springframework.stereotype.Service;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -103,6 +104,7 @@ public class DatabaseConfigService {
                 .collect(Collectors.toList()) // Collect to avoid concurrent modification
                 .forEach(properties::remove);
     }
+
     private String getJdbcDriver(String dbType) {
         return switch (dbType.toLowerCase()) {
             case "postgresql" -> "org.postgresql.Driver";
@@ -149,7 +151,7 @@ public class DatabaseConfigService {
 
         // Generate relationship mappings
         for (SchemaMappingDTO mapping : relationshipMappings) {
-            generateRelationshipMapping(obdaContent, mapping, request.databaseConfig());
+            generateRelationshipMapping(obdaContent, mapping, request.databaseConfig(), propertyMappings);
         }
 
         obdaContent.append("]]");
@@ -166,7 +168,7 @@ public class DatabaseConfigService {
                                        String schemaClass,
                                        List<SchemaMappingDTO> mappings) {
         StringBuilder target = new StringBuilder();
-        target.append(String.format(":Resource/{%s} a schema:%s", primaryKey, schemaClass));
+        target.append(String.format(":%s/{%s} a schema:%s", schemaClass, primaryKey, schemaClass));
 
         StringBuilder source = new StringBuilder();
         source.append("SELECT ").append(primaryKey);
@@ -188,19 +190,24 @@ public class DatabaseConfigService {
 
     private void generateRelationshipMapping(StringBuilder obdaContent,
                                              SchemaMappingDTO mapping,
-                                             DatabaseConfigDTO config) {
+                                             DatabaseConfigDTO config,
+                                             Map<String, List<SchemaMappingDTO>> propertyMappings) {
         String sourceTable = mapping.getDatabaseTable();
         String targetTable = mapping.getTargetTable();
         String sourcePrimaryKey = getPrimaryKeyColumn(config, sourceTable);
         String targetPrimaryKey = getPrimaryKeyColumn(config, targetTable);
 
+        // Get schema classes for both tables
+        String sourceSchemaClass = getSchemaClassForTable(sourceTable, propertyMappings);
+        String targetSchemaClass = getSchemaClassForTable(targetTable, propertyMappings);
+
         String mappingId = String.format("%s_%s_rel", sourceTable, targetTable);
 
         obdaContent.append(String.format("mappingId %s\n", mappingId))
-                .append(String.format("target  :Resource/{%s} schema:%s :Resource/{%s} .\n",
-                        sourcePrimaryKey,
+                .append(String.format("target  :%s/{%s} schema:%s :%s/{%s} .\n",
+                        sourceSchemaClass, sourcePrimaryKey,
                         mapping.getSchemaProperty(),
-                        targetPrimaryKey))
+                        targetSchemaClass, targetPrimaryKey))
                 .append("source  ")
                 .append(String.format("SELECT s.%s, t.%s FROM %s s JOIN %s t ON s.%s = t.%s",
                         sourcePrimaryKey,
@@ -211,6 +218,15 @@ public class DatabaseConfigService {
                         mapping.getTargetKey()))
                 .append("\n\n");
     }
+
+    private String getSchemaClassForTable(String tableName, Map<String, List<SchemaMappingDTO>> propertyMappings) {
+        List<SchemaMappingDTO> mappings = propertyMappings.get(tableName);
+        if (mappings != null && !mappings.isEmpty()) {
+            return mappings.get(0).getSchemaClass();
+        }
+        throw new RuntimeException("No schema class found for table: " + tableName);
+    }
+
     private boolean hasUserIdColumn(DatabaseConfigDTO config, String tableName) {
         try (Connection conn = DriverManager.getConnection(
                 config.getJdbcUrl(),
@@ -318,6 +334,7 @@ public class DatabaseConfigService {
         }
         return null;
     }
+
     public List<DatabaseConfigDTO> getDatabasesForController(Long controllerId) throws IOException {
         String configPath = getConfigPath(controllerId);
         if (!Files.exists(Paths.get(configPath))) {
@@ -363,6 +380,7 @@ public class DatabaseConfigService {
         List<DatabaseConfigDTO> result = new ArrayList<>(configs.values());
         return result;
     }
+
     public List<TableMetadataDTO> getDatabaseTables(DatabaseConfigDTO config) {
         List<TableMetadataDTO> tables = new ArrayList<>();
 

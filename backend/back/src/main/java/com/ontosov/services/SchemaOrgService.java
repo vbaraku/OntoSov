@@ -5,6 +5,7 @@ import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -60,7 +61,7 @@ public class SchemaOrgService {
             // Then find properties for each class
             System.out.println("\nScanning for properties...");
             Property domainIncludes = model.createProperty(SCHEMA_NS + "domainIncludes");
-            statements = model.listStatements(null, domainIncludes, (RDFNode)null);
+            statements = model.listStatements(null, domainIncludes, (RDFNode) null);
 
             while (statements.hasNext()) {
                 Statement stmt = statements.next();
@@ -91,7 +92,7 @@ public class SchemaOrgService {
                 System.out.println("\nWARNING: No classes were loaded!");
                 System.out.println("Checking if Person class exists in model:");
                 Resource person = model.createResource(SCHEMA_NS + "Person");
-                StmtIterator personStmts = model.listStatements(person, null, (RDFNode)null);
+                StmtIterator personStmts = model.listStatements(person, null, (RDFNode) null);
                 while (personStmts.hasNext()) {
                     System.out.println(personStmts.next());
                 }
@@ -113,7 +114,23 @@ public class SchemaOrgService {
     }
 
     public List<String> getPropertiesForClass(String className) {
-        return new ArrayList<>(classPropertiesCache.getOrDefault(className, new HashSet<>()));
+        Set<String> properties = new HashSet<>();
+
+        // Add properties specifically found for this class
+        properties.addAll(classPropertiesCache.getOrDefault(className, new HashSet<>()));
+
+        // Add ALL properties discovered from Schema.org (generic approach)
+        properties.addAll(getAllDiscoveredProperties());
+
+        return properties.stream()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    private Set<String> getAllDiscoveredProperties() {
+        return classPropertiesCache.values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
     }
 
     private void loadDefaultSchema() {
