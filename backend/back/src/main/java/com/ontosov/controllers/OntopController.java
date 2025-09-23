@@ -33,7 +33,25 @@ public class OntopController {
                                         list.forEach(item -> {
                                             String propertyName = item.get("property")
                                                     .replace("http://schema.org/", "");
-                                            properties.put(propertyName, item.get("value"));
+                                            String value = item.get("value");
+
+                                            // Handle multiple values for same property
+                                            if (properties.containsKey(propertyName)) {
+                                                Object existing = properties.get(propertyName);
+                                                if (existing instanceof List) {
+                                                    // Already a list, just add the new value
+                                                    ((List<String>) existing).add(value);
+                                                } else {
+                                                    // Convert single value to list and add new value
+                                                    List<String> valueList = new ArrayList<>();
+                                                    valueList.add((String) existing);
+                                                    valueList.add(value);
+                                                    properties.put(propertyName, valueList);
+                                                }
+                                            } else {
+                                                // First occurrence of this property
+                                                properties.put(propertyName, value);
+                                            }
                                         });
                                         return properties;
                                     }
