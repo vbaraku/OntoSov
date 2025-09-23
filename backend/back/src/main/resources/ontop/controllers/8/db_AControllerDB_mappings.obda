@@ -9,8 +9,8 @@ target  :Order/{order_id} a schema:Order ; schema:orderDate {order_date} .
 source  SELECT order_id, order_date FROM order_history
 
 mappingId user_profiles_mapping
-target  :Person/{user_id} a schema:Person ; schema:givenName {name} ; schema:taxID {tax_id} ; schema:email {email} .
-source  SELECT user_id, name, tax_id, email FROM user_profiles
+target  :Person/{user_id} a schema:Person ; schema:givenName {name} ; schema:taxID {tax_id} ; schema:email {email} ; schema:telephone {phone_number} .
+source  SELECT user_id, name, tax_id, email, phone_number FROM user_profiles
 
 mappingId store_locations_mapping
 target  :Store/{store_id} a schema:Store ; schema:name {store_name} ; schema:address {city} .

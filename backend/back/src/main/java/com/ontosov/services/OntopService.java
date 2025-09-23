@@ -144,16 +144,24 @@ public class OntopService {
                 try (TupleQueryResult rs = query.evaluate()) {
                     while (rs.hasNext()) {
                         var bindingSet = rs.next();
+
+                        if (bindingSet.getValue("entity") == null ||
+                                bindingSet.getValue("parentEntity") == null ||
+                                bindingSet.getValue("property") == null ||
+                                bindingSet.getValue("value") == null) {
+                            log.warn("Skipping result with null values: {}", bindingSet);
+                            continue;
+                        }
+
                         Map<String, String> resultRow = new HashMap<>();
+                        resultRow.put("entity", bindingSet.getValue("entity").stringValue());
+                        resultRow.put("parentEntity", bindingSet.getValue("parentEntity").stringValue());
                         resultRow.put("property", bindingSet.getValue("property").stringValue());
                         resultRow.put("value", bindingSet.getValue("value").stringValue());
                         resultRow.put("source", config.name);
                         results.add(resultRow);
-                        //add debug logs to this method to see the data
                         log.info("Result row: {}", resultRow);
-
                     }
-                    //add debug log
                     log.info("Results: {}", results);
                 }
             }
@@ -181,32 +189,35 @@ public class OntopService {
                 PREFIX schema: <http://schema.org/>
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-                SELECT ?property ?value
+                SELECT ?entity ?parentEntity ?property ?value
                 WHERE {
                     ?person a schema:Person ;
                             schema:taxID ?taxIdParam .
                     
                     {
-                        # Direct person properties
+                        # Direct person properties - simplified binding
                         ?person ?property ?value .
-                        FILTER(?property != rdf:type)
-                        FILTER(!isURI(?value))
+                        BIND(?person AS ?entity)
+                        BIND(?person AS ?parentEntity)
+                        FILTER(?property != rdf:type && !isURI(?value))
                     }
                     UNION
                     {
-                        # Orders by this person
-                        ?order ?relationToPerson ?person ;
+                        # First-level entities (Orders, MedicalEntity, etc.)
+                        ?entity ?relationToPerson ?person ;
                                ?property ?value .
-                        FILTER(!isURI(?value))
-                        FILTER(?property != ?relationToPerson)
+                        BIND(?entity AS ?parentEntity)
+                        FILTER(!isURI(?value) && ?property != ?relationToPerson)
                     }
                     UNION
                     {
-                        # Products from orders by this person  
-                        ?order ?relationToPerson ?person ;
-                               ?relationToProduct ?product .
-                        ?product ?property ?value .
+                        # Second-level entities (Products in Orders)
+                        ?firstLevel ?relationToPerson ?person .
+                        ?firstLevel ?relationToSecondLevel ?entity .
+                        ?entity ?property ?value .
+                        BIND(?firstLevel AS ?parentEntity)
                         FILTER(!isURI(?value))
+                        FILTER(?entity != ?person)
                     }
                 }
                 """;
