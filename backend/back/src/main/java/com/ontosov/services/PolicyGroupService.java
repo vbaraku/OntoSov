@@ -504,7 +504,7 @@ public class PolicyGroupService {
 
             // Remove all data assignments for this group
             Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
-            StmtIterator assignmentIterator = policyModel.listStatements(policyGroup, hasDataAssignmentProperty, (RDFNode)null);
+            StmtIterator assignmentIterator = policyModel.listStatements(policyGroup, hasDataAssignmentProperty, (RDFNode) null);
             while (assignmentIterator.hasNext()) {
                 Statement stmt = assignmentIterator.next();
                 Resource assignment = stmt.getObject().asResource();
@@ -542,19 +542,41 @@ public class PolicyGroupService {
             Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
             policyGroup.removeAll(hasDataAssignmentProperty);
 
-            // Create new data assignments
-            for (Map.Entry<String, Set<String>> entry : assignmentDTO.getDataAssignments().entrySet()) {
-                String dataSource = entry.getKey();
-                Set<String> properties = entry.getValue();
+            // Create new property assignments
+            if (assignmentDTO.getPropertyAssignments() != null) {
+                for (Map.Entry<String, Set<String>> entry : assignmentDTO.getPropertyAssignments().entrySet()) {
+                    String dataSource = entry.getKey();
+                    Set<String> properties = entry.getValue();
 
-                for (String property : properties) {
-                    // Create a resource representing this data assignment
-                    Resource dataAssignment = policyModel.createResource();
-                    dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
-                    dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataProperty"), property);
+                    for (String property : properties) {
+                        // Create a resource representing this property assignment
+                        Resource dataAssignment = policyModel.createResource();
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataProperty"), property);
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "property");
 
-                    // Link it to the policy group
-                    policyGroup.addProperty(hasDataAssignmentProperty, dataAssignment);
+                        // Link it to the policy group
+                        policyGroup.addProperty(hasDataAssignmentProperty, dataAssignment);
+                    }
+                }
+            }
+
+            // Create new entity assignments
+            if (assignmentDTO.getEntityAssignments() != null) {
+                for (Map.Entry<String, Set<String>> entry : assignmentDTO.getEntityAssignments().entrySet()) {
+                    String dataSource = entry.getKey();
+                    Set<String> entityIds = entry.getValue();
+
+                    for (String entityId : entityIds) {
+                        // Create a resource representing this entity assignment
+                        Resource dataAssignment = policyModel.createResource();
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "entityId"), entityId);
+                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "entity");
+
+                        // Link it to the policy group
+                        policyGroup.addProperty(hasDataAssignmentProperty, dataAssignment);
+                    }
                 }
             }
 

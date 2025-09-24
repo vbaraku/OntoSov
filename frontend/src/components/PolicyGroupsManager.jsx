@@ -46,7 +46,7 @@ const tooltips = {
   notification:
     "Receive notifications when your data is accessed according to allowed permissions",
   allowAiTraining: "Allow your data to be used for training AI models",
-  aiAlgorithm: "Specify which AI algorithm can be used to process your data"
+  aiAlgorithm: "Specify which AI algorithm can be used to process your data",
 };
 
 const initialFormState = {
@@ -197,7 +197,9 @@ const PolicyGroupForm = React.memo(
           >
             <MenuItem value="email">Email</MenuItem>
           </Select>
-          <FormHelperText>How you'll be notified of policy violations</FormHelperText>
+          <FormHelperText>
+            How you'll be notified of policy violations
+          </FormHelperText>
         </FormControl>
 
         <FormControl fullWidth sx={{ mb: 3 }}>
@@ -247,7 +249,7 @@ const PolicyGroupForm = React.memo(
             </IconButton>
           </Tooltip>
         </Box>
-        
+
         {formState.aiRestrictions.allowAiTraining && (
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel>Allowed AI Algorithm</InputLabel>
@@ -267,9 +269,15 @@ const PolicyGroupForm = React.memo(
               <MenuItem value="">
                 <em>Any algorithm</em>
               </MenuItem>
-              <MenuItem value="federatedLearning">Federated Learning Only</MenuItem>
-              <MenuItem value="differentialPrivacy">Differential Privacy</MenuItem>
-              <MenuItem value="secureEnclave">Secure Enclave Processing</MenuItem>
+              <MenuItem value="federatedLearning">
+                Federated Learning Only
+              </MenuItem>
+              <MenuItem value="differentialPrivacy">
+                Differential Privacy
+              </MenuItem>
+              <MenuItem value="secureEnclave">
+                Secure Enclave Processing
+              </MenuItem>
               <MenuItem value="localProcessing">Local Processing Only</MenuItem>
             </Select>
             <FormHelperText>
@@ -291,130 +299,305 @@ const PolicyGroupForm = React.memo(
   }
 );
 
-const AssignPolicyForm = React.memo(({ data, onSave, onCancel, groupName, initialSelectedData = {} }) => {
-  const [selectedData, setSelectedData] = useState(initialSelectedData);
+const AssignPolicyForm = React.memo(
+  ({ data, onSave, onCancel, groupName, initialSelectedData = {} }) => {
+    const [selectedPropertyData, setSelectedPropertyData] = useState(
+      initialSelectedData.properties || {}
+    );
+    const [selectedEntityData, setSelectedEntityData] = useState(
+      initialSelectedData.entities || {}
+    );
 
-  const toggleDataSelection = (source, property) => {
-    setSelectedData(prev => {
-      const newState = {...prev};
-      
-      // Initialize if needed
-      if (!newState[source]) {
-        newState[source] = new Set([property]);
-        return newState;
-      }
-      
-      // Handle Set
-      if (newState[source] instanceof Set) {
-        if (newState[source].has(property)) {
-          newState[source].delete(property);
-          if (newState[source].size === 0) {
-            delete newState[source];
-          }
-        } else {
-          newState[source].add(property);
+    const togglePropertySelection = (source, property) => {
+      setSelectedPropertyData((prev) => {
+        const newState = { ...prev };
+
+        if (!newState[source]) {
+          newState[source] = new Set([property]);
+          return newState;
         }
-        return newState;
-      }
-      
-      // Handle Array
-      if (Array.isArray(newState[source])) {
-        if (newState[source].includes(property)) {
-          newState[source] = newState[source].filter(p => p !== property);
-          if (newState[source].length === 0) {
-            delete newState[source];
+
+        if (newState[source] instanceof Set) {
+          if (newState[source].has(property)) {
+            newState[source].delete(property);
+            if (newState[source].size === 0) {
+              delete newState[source];
+            }
+          } else {
+            newState[source].add(property);
           }
-        } else {
-          newState[source] = [...newState[source], property];
+          return newState;
         }
-        return newState;
-      }
-      
-      // Handle Object
-      if (typeof newState[source] === 'object') {
-        if (newState[source][property]) {
-          delete newState[source][property];
-          if (Object.keys(newState[source]).length === 0) {
-            delete newState[source];
+
+        if (Array.isArray(newState[source])) {
+          if (newState[source].includes(property)) {
+            newState[source] = newState[source].filter((p) => p !== property);
+            if (newState[source].length === 0) {
+              delete newState[source];
+            }
+          } else {
+            newState[source] = [...newState[source], property];
           }
-        } else {
-          newState[source][property] = true;
+          return newState;
         }
+
         return newState;
+      });
+    };
+
+    const toggleEntitySelection = (source, entityId) => {
+      setSelectedEntityData((prev) => {
+        const newState = { ...prev };
+
+        if (!newState[source]) {
+          newState[source] = new Set([entityId]);
+          return newState;
+        }
+
+        if (newState[source] instanceof Set) {
+          if (newState[source].has(entityId)) {
+            newState[source].delete(entityId);
+            if (newState[source].size === 0) {
+              delete newState[source];
+            }
+          } else {
+            newState[source].add(entityId);
+          }
+          return newState;
+        }
+
+        if (Array.isArray(newState[source])) {
+          if (newState[source].includes(entityId)) {
+            newState[source] = newState[source].filter((e) => e !== entityId);
+            if (newState[source].length === 0) {
+              delete newState[source];
+            }
+          } else {
+            newState[source] = [...newState[source], entityId];
+          }
+          return newState;
+        }
+
+        return newState;
+      });
+    };
+
+    const isPropertySelected = (source, property) => {
+      if (!selectedPropertyData[source]) return false;
+
+      if (selectedPropertyData[source] instanceof Set) {
+        return selectedPropertyData[source].has(property);
       }
-      
-      return newState;
-    });
-  };
 
-  const isSelected = (source, property) => {
-    if (!selectedData[source]) return false;
-  
-    // If it's a Set, use has method
-    if (selectedData[source] instanceof Set) {
-      return selectedData[source].has(property);
-    }
-    
-    // If it's an Array, use includes
-    if (Array.isArray(selectedData[source])) {
-      return selectedData[source].includes(property);
-    }
-    
-    // Otherwise, check if the property exists as a key
-    return selectedData[source][property] === true;
-  };
-
-  const handleSave = () => {
-    // Convert from any format to Array for the API
-    const dataAssignments = {};
-    
-    Object.entries(selectedData).forEach(([source, value]) => {
-      if (value instanceof Set) {
-        dataAssignments[source] = Array.from(value);
-      } else if (Array.isArray(value)) {
-        dataAssignments[source] = [...value];
-      } else if (typeof value === 'object') {
-        dataAssignments[source] = Object.keys(value).filter(key => value[key]);
+      if (Array.isArray(selectedPropertyData[source])) {
+        return selectedPropertyData[source].includes(property);
       }
-    });
-    
-    onSave(dataAssignments);
-  };
 
-  return (
-    <Box sx={{ p: 2 }}>
-      {Object.entries(data).map(([source, properties]) => (
-        <Card key={source} sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            {source}
-          </Typography>
-          {Object.entries(properties).map(([property, value]) => (
-            <FormControlLabel
-              key={property}
-              control={
-                <Checkbox
-                  checked={isSelected(source, property)}
-                  onChange={() => toggleDataSelection(source, property)}
-                />
-              }
-              label={`${property}: ${value}`}
-            />
-          ))}
-        </Card>
-      ))}
-      <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={Object.keys(selectedData).length === 0}
+      return selectedPropertyData[source][property] === true;
+    };
+
+    const isEntitySelected = (source, entityId) => {
+      if (!selectedEntityData[source]) return false;
+
+      if (selectedEntityData[source] instanceof Set) {
+        return selectedEntityData[source].has(entityId);
+      }
+
+      if (Array.isArray(selectedEntityData[source])) {
+        return selectedEntityData[source].includes(entityId);
+      }
+
+      return selectedEntityData[source][entityId] === true;
+    };
+
+    const handleSave = () => {
+      // Convert both to Arrays for the API
+      const propertyAssignments = {};
+      const entityAssignments = {};
+
+      Object.entries(selectedPropertyData).forEach(([source, value]) => {
+        if (value instanceof Set) {
+          propertyAssignments[source] = Array.from(value);
+        } else if (Array.isArray(value)) {
+          propertyAssignments[source] = [...value];
+        } else if (typeof value === "object") {
+          propertyAssignments[source] = Object.keys(value).filter(
+            (key) => value[key]
+          );
+        }
+      });
+
+      Object.entries(selectedEntityData).forEach(([source, value]) => {
+        if (value instanceof Set) {
+          entityAssignments[source] = Array.from(value);
+        } else if (Array.isArray(value)) {
+          entityAssignments[source] = [...value];
+        } else if (typeof value === "object") {
+          entityAssignments[source] = Object.keys(value).filter(
+            (key) => value[key]
+          );
+        }
+      });
+
+      onSave({ propertyAssignments, entityAssignments });
+    };
+
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Assign "{groupName}" policy to data elements
+        </Typography>
+
+        {Object.entries(data).map(([source, sourceData]) => (
+          <Card key={source} sx={{ mb: 2 }} variant="outlined">
+            <CardContent>
+              <Typography variant="subtitle1" color="primary" gutterBottom>
+                {source}
+              </Typography>
+
+              {/* Person Properties Section */}
+              {sourceData.Person && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Personal Information
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {Object.keys(sourceData.Person).map((property) => (
+                      <Grid item key={property}>
+                        <Chip
+                          label={property}
+                          clickable
+                          color={
+                            isPropertySelected(source, property)
+                              ? "primary"
+                              : "default"
+                          }
+                          variant={
+                            isPropertySelected(source, property)
+                              ? "filled"
+                              : "outlined"
+                          }
+                          onClick={() =>
+                            togglePropertySelection(source, property)
+                          }
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {/* Entity Records Section */}
+              {Object.entries(sourceData)
+                .filter(([entityType]) => entityType !== "Person")
+                .map(([entityType, entityData]) => {
+                  if (!Array.isArray(entityData)) return null;
+
+                  return (
+                    <Box key={entityType} sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        {entityType} Records
+                      </Typography>
+                      <Grid container spacing={1}>
+                        {entityData.map((entity, index) => {
+                          const displayText = `${entityType} #${index + 1}`;
+                          const previewText = Object.entries(entity.properties)
+                            .slice(0, 2)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join(", ");
+
+                          return (
+                            <Grid item xs={12} sm={6} key={entity.entityId}>
+                              <Card
+                                variant="outlined"
+                                sx={{
+                                  cursor: "pointer",
+                                  bgcolor: isEntitySelected(
+                                    source,
+                                    entity.entityId
+                                  )
+                                    ? "primary.50"
+                                    : "background.paper",
+                                  borderColor: isEntitySelected(
+                                    source,
+                                    entity.entityId
+                                  )
+                                    ? "primary.main"
+                                    : "divider",
+                                  "&:hover": {
+                                    bgcolor: isEntitySelected(
+                                      source,
+                                      entity.entityId
+                                    )
+                                      ? "primary.100"
+                                      : "action.hover",
+                                  },
+                                }}
+                                onClick={() =>
+                                  toggleEntitySelection(source, entity.entityId)
+                                }
+                              >
+                                <CardContent
+                                  sx={{ p: 2, "&:last-child": { pb: 2 } }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                    }}
+                                  >
+                                    <Box>
+                                      <Typography variant="subtitle2">
+                                        {displayText}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        {previewText}...
+                                      </Typography>
+                                    </Box>
+                                    <Checkbox
+                                      checked={isEntitySelected(
+                                        source,
+                                        entity.entityId
+                                      )}
+                                      size="small"
+                                    />
+                                  </Box>
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                          );
+                        })}
+                      </Grid>
+                    </Box>
+                  );
+                })}
+            </CardContent>
+          </Card>
+        ))}
+
+        <Box
+          sx={{ mt: 3, display: "flex", gap: 2, justifyContent: "flex-end" }}
         >
-          Apply Policies
-        </Button>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={
+              Object.keys(selectedPropertyData).length === 0 &&
+              Object.keys(selectedEntityData).length === 0
+            }
+          >
+            Assign Policy
+          </Button>
+        </Box>
       </Box>
-    </Box>
-  );
-});
+    );
+  }
+);
 
 // Template selection dialog component
 const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
@@ -423,13 +606,19 @@ const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
       <DialogTitle>Select Privacy Tier Template</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" paragraph>
-          Choose a privacy tier template based on how sensitive you consider your data.
-          You can customize it further after selection.
+          Choose a privacy tier template based on how sensitive you consider
+          your data. You can customize it further after selection.
         </Typography>
         <Grid container spacing={2}>
           {templates.map((template, index) => (
             <Grid item xs={12} md={6} key={index}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Card
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Typography variant="h6" gutterBottom>
                     {template.name}
@@ -437,20 +626,22 @@ const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
                   <Typography variant="body2" color="text.secondary" paragraph>
                     {template.description}
                   </Typography>
-                  <Typography variant="subtitle2" gutterBottom>Permissions:</Typography>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Permissions:
+                  </Typography>
                   <Box sx={{ mb: 1 }}>
                     {Object.entries(template.permissions)
                       .filter(([_, value]) => value)
                       .map(([key]) => (
-                        <Chip 
-                          key={key} 
-                          label={key.charAt(0).toUpperCase() + key.slice(1)} 
-                          size="small" 
-                          sx={{ mr: 0.5, mb: 0.5 }} 
+                        <Chip
+                          key={key}
+                          label={key.charAt(0).toUpperCase() + key.slice(1)}
+                          size="small"
+                          sx={{ mr: 0.5, mb: 0.5 }}
                         />
                       ))}
                   </Box>
-                  
+
                   {template.aiRestrictions?.allowAiTraining === false && (
                     <Typography variant="body2" color="error" sx={{ mt: 1 }}>
                       AI Training: Not Allowed
@@ -458,9 +649,9 @@ const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
                   )}
                 </CardContent>
                 <CardActions>
-                  <Button 
-                    fullWidth 
-                    variant="outlined" 
+                  <Button
+                    fullWidth
+                    variant="outlined"
                     onClick={() => onSelect(template)}
                   >
                     Use Template
@@ -478,7 +669,12 @@ const TemplateSelectionDialog = ({ open, onClose, templates, onSelect }) => {
   );
 };
 
-const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
+const PolicyGroupsManager = ({
+  data,
+  userId,
+  initialSelectedData,
+  selectedDataForPolicy,
+}) => {
   const [policyGroups, setPolicyGroups] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -522,7 +718,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
       setLoading(false);
     }
   };
-  
+
   const fetchTemplates = async () => {
     try {
       const response = await fetch(
@@ -661,52 +857,61 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
 
   const handleAssignGroup = async (group) => {
     setSelectedGroup(group);
-    
+
     // Extract the real ID from the policy URI format
     let cleanedId = group.id;
-    if (cleanedId.includes('#')) {
-      cleanedId = cleanedId.substring(cleanedId.lastIndexOf('#') + 1);
-    } else if (cleanedId.includes('/')) {
-      cleanedId = cleanedId.substring(cleanedId.lastIndexOf('/') + 1);
+    if (cleanedId.includes("#")) {
+      cleanedId = cleanedId.substring(cleanedId.lastIndexOf("#") + 1);
+    } else if (cleanedId.includes("/")) {
+      cleanedId = cleanedId.substring(cleanedId.lastIndexOf("/") + 1);
     }
-    
+
     // Fetch current assignments for this policy group
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8080/api/policy-groups/${cleanedId}/assignments?subjectId=${userId}`);
-      
+      const response = await fetch(
+        `http://localhost:8080/api/policy-groups/${cleanedId}/assignments?subjectId=${userId}`
+      );
+
       if (response.ok) {
         const currentAssignments = await response.json();
-        
+
         // If we have initialSelectedData, merge it with current assignments
         if (initialSelectedData) {
           // Convert initialSelectedData to the format expected by the component
           const formattedInitialData = {};
-          
-          Object.entries(initialSelectedData).forEach(([source, properties]) => {
-            if (Array.isArray(properties)) {
-              formattedInitialData[source] = new Set(properties);
-            } else {
-              formattedInitialData[source] = new Set([properties]);
+
+          Object.entries(initialSelectedData).forEach(
+            ([source, properties]) => {
+              if (Array.isArray(properties)) {
+                formattedInitialData[source] = new Set(properties);
+              } else {
+                formattedInitialData[source] = new Set([properties]);
+              }
             }
-          });
-          
+          );
+
           // Merge with current assignments
           const mergedData = { ...currentAssignments };
-          
-          Object.entries(formattedInitialData).forEach(([source, properties]) => {
-            if (!mergedData[source]) {
-              mergedData[source] = new Set();
-            } else if (!(mergedData[source] instanceof Set)) {
-              // Convert to Set if it's not already
-              mergedData[source] = new Set(Array.isArray(mergedData[source]) ? 
-                mergedData[source] : Object.keys(mergedData[source]));
+
+          Object.entries(formattedInitialData).forEach(
+            ([source, properties]) => {
+              if (!mergedData[source]) {
+                mergedData[source] = new Set();
+              } else if (!(mergedData[source] instanceof Set)) {
+                // Convert to Set if it's not already
+                mergedData[source] = new Set(
+                  Array.isArray(mergedData[source])
+                    ? mergedData[source]
+                    : Object.keys(mergedData[source])
+                );
+              }
+
+              // Add each property
+              properties.forEach((prop) => mergedData[source].add(prop));
             }
-            
-            // Add each property
-            properties.forEach(prop => mergedData[source].add(prop));
-          });
-          
+          );
+
           setSelectedData(mergedData);
         } else {
           setSelectedData(currentAssignments);
@@ -720,15 +925,18 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
     }
   };
 
-  const handleAssignData = async (dataAssignments) => {
+  const handleAssignData = async (assignmentData) => {
     setLoading(true);
     try {
       // Extract the real ID from the policy#pg-... format
       const realGroupId = selectedGroup.id.includes("#")
         ? selectedGroup.id.split("#")[1]
         : selectedGroup.id;
-
       console.log(`Using cleaned ID: ${realGroupId}`);
+      console.log(
+        "Sending assignment data:",
+        JSON.stringify(assignmentData, null, 2)
+      );
 
       const response = await fetch(
         `http://localhost:8080/api/policy-groups/${realGroupId}/assign?subjectId=${userId}`,
@@ -737,15 +945,11 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            policyGroupId: realGroupId,
-            dataAssignments,
-          }),
+          body: JSON.stringify(assignmentData), // Now sends {propertyAssignments, entityAssignments}
         }
       );
 
       if (!response.ok) throw new Error("Failed to assign data to policy");
-
       setSnackbar({
         open: true,
         message: "Data assigned to policy successfully",
@@ -804,8 +1008,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
 
       {policyGroups.length === 0 && !loading ? (
         <Alert severity="info">
-          No policies found. Create your first policy to manage data
-          access.
+          No policies found. Create your first policy to manage data access.
         </Alert>
       ) : (
         <List>
@@ -826,25 +1029,32 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
                     <Typography variant="body2" color="text.secondary">
                       {group.description}
                     </Typography>
-                    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    <Box
+                      sx={{
+                        mt: 1,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 0.5,
+                      }}
+                    >
                       {/* Display permissions as badges */}
                       {Object.entries(group.permissions)
                         .filter(([_, value]) => value)
                         .map(([key]) => (
-                          <Chip 
-                            key={key} 
-                            label={key.charAt(0).toUpperCase() + key.slice(1)} 
-                            size="small" 
+                          <Chip
+                            key={key}
+                            label={key.charAt(0).toUpperCase() + key.slice(1)}
+                            size="small"
                             color="primary"
                             variant="outlined"
                           />
                         ))}
-                      
+
                       {/* Display AI training restriction if present */}
                       {group.aiRestrictions?.allowAiTraining === false && (
-                        <Chip 
-                          label="No AI Training" 
-                          size="small" 
+                        <Chip
+                          label="No AI Training"
+                          size="small"
                           color="error"
                           variant="outlined"
                         />
@@ -913,7 +1123,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
           <AssignPolicyForm
             data={data}
             groupName={selectedGroup?.name}
-            initialSelectedData={selectedData}
+            initialSelectedData={initialSelectedData}
             onSave={handleAssignData}
             onCancel={() => {
               setAssignDialogOpen(false);
@@ -922,7 +1132,7 @@ const PolicyGroupsManager = ({ data, userId, initialSelectedData }) => {
           />
         </DialogContent>
       </Dialog>
-      
+
       <TemplateSelectionDialog
         open={templateDialogOpen}
         onClose={() => setTemplateDialogOpen(false)}

@@ -7,6 +7,8 @@ import com.ontosov.dto.PolicyStatusDTO;
 import com.ontosov.services.ODRLService;
 import com.ontosov.services.PolicyGroupService;
 import com.ontosov.services.PolicyTemplateService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +20,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/policy-groups")
 public class PolicyGroupController {
+    private static final Logger log = LoggerFactory.getLogger(ODRLService.class);
 
     @Autowired
     private PolicyGroupService policyGroupService;
@@ -94,6 +97,10 @@ public class PolicyGroupController {
             @PathVariable String groupId,
             @RequestBody PolicyAssignmentDTO assignmentDTO,
             @RequestParam Long subjectId) {
+        log.info("=== ASSIGNMENT REQUEST RECEIVED ===");
+        log.info("Group ID: {}", groupId);
+        log.info("Subject ID: {}", subjectId);
+        log.info("Assignment DTO: {}", assignmentDTO);
         try {
             // Get the policy group details
             List<PolicyGroupDTO> groups = policyGroupService.getPolicyGroupsBySubject(subjectId);
@@ -102,7 +109,7 @@ public class PolicyGroupController {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Policy group not found"));
 
-            // Assign data to policy and generate ODRL policies
+            // This will now handle both property and entity assignments
             policyGroupService.assignDataToPolicy(groupId, assignmentDTO, subjectId);
             odrlService.generatePoliciesFromAssignment(groupId, policyGroup, assignmentDTO, subjectId);
 
