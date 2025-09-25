@@ -113,27 +113,50 @@ public class ODRLService {
     }
 
     public void generatePoliciesFromAssignment(String policyGroupId, PolicyGroupDTO policyGroup,
-                                               PolicyAssignmentDTO assignment, Long subjectId) {
+                                               PolicyAssignmentDTO assignmentDTO, Long subjectId) {
         dataset.begin(ReadWrite.WRITE);
 
         try {
-            // First, let's remove any existing policies for this assignment
-            removePoliciesForAssignment(policyGroupId, assignment, subjectId);
+            // Clear any existing policies for this group
+            cleanupPoliciesForGroup(policyGroupId, subjectId);
 
-            // For each source and property, create appropriate ODRL policies
-            for (Map.Entry<String, Set<String>> entry : assignment.getDataAssignments().entrySet()) {
-                String dataSource = entry.getKey();
-                Set<String> properties = entry.getValue();
+            // Handle property assignments
+            if (assignmentDTO.getPropertyAssignments() != null) {
+                for (Map.Entry<String, Set<String>> sourceEntry : assignmentDTO.getPropertyAssignments().entrySet()) {
+                    String dataSource = sourceEntry.getKey();
+                    Set<String> properties = sourceEntry.getValue();
 
-                for (String property : properties) {
-                    // For each permission in the policy group
-                    for (Map.Entry<String, Boolean> permEntry : policyGroup.getPermissions().entrySet()) {
-                        if (Boolean.TRUE.equals(permEntry.getValue())) {
-                            String action = permEntry.getKey();
-                            createPolicy(policyGroupId, subjectId, dataSource, property, action,
-                                    policyGroup.getConstraints(),
-                                    policyGroup.getConsequences(),
-                                    policyGroup.getAiRestrictions());
+                    for (String property : properties) {
+                        for (String action : Arrays.asList("read", "use", "share", "aggregate", "modify")) {
+                            if (policyGroup.getPermissions().containsKey(action) &&
+                                    policyGroup.getPermissions().get(action)) {
+                                createPropertyPolicy(policyGroupId, subjectId, dataSource, property, action,
+                                        policyGroup.getConstraints(),
+                                        policyGroup.getConsequences(),
+                                        policyGroup.getAiRestrictions());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle entity assignments
+            if (assignmentDTO.getEntityAssignments() != null) {
+                for (Map.Entry<String, Set<String>> sourceEntry : assignmentDTO.getEntityAssignments().entrySet()) {
+                    String dataSource = sourceEntry.getKey();
+                    Set<String> entityIds = sourceEntry.getValue();
+
+                    for (String entityId : entityIds) {
+                        String entityType = extractEntityTypeFromUri(entityId);
+
+                        for (String action : Arrays.asList("read", "use", "share", "aggregate", "modify")) {
+                            if (policyGroup.getPermissions().containsKey(action) &&
+                                    policyGroup.getPermissions().get(action)) {
+                                createEntityPolicy(policyGroupId, subjectId, dataSource, entityType, entityId, action,
+                                        policyGroup.getConstraints(),
+                                        policyGroup.getConsequences(),
+                                        policyGroup.getAiRestrictions());
+                            }
                         }
                     }
                 }
@@ -148,9 +171,9 @@ public class ODRLService {
         }
     }
 
-    private void createPolicy(String policyGroupId, Long subjectId, String dataSource,
-                              String property, String action, Map<String, Object> constraints,
-                              Map<String, Object> consequences, Map<String, Object> aiRestrictions) {
+    private void createPropertyPolicy(String policyGroupId, Long subjectId, String dataSource,
+                                      String property, String action, Map<String, Object> constraints,
+                                      Map<String, Object> consequences, Map<String, Object> aiRestrictions) {
         // Create a unique ID for the policy
         String policyId = "policy-" + UUID.randomUUID().toString();
         Resource policy = odrlModel.createResource(ODRL_NS + policyId);
@@ -279,8 +302,7 @@ public class ODRLService {
 
                 // Add prohibition to policy
                 policy.addProperty(odrlModel.createProperty(ODRL_NS, "prohibition"), prohibition);
-            }
-            else if (aiAlgorithm != null && !aiAlgorithm.isEmpty()) {
+            } else if (aiAlgorithm != null && !aiAlgorithm.isEmpty()) {
                 // Create permission with constraint for specific AI algorithm
                 Resource aiConstraint = odrlModel.createResource();
                 aiConstraint.addProperty(RDF.type, constraintResource);
@@ -304,8 +326,137 @@ public class ODRLService {
         }
     }
 
+    private void createEntityPolicy(String policyGroupId, Long subjectId, String dataSource,
+                                    String entityType, String entityId, String action,
+                                    Map<String, Object> constraints, Map<String, Object> consequences,
+                                    Map<String, Object> aiRestrictions) {
+        // Create a unique ID for the policy
+        String policyId = "policy-" + UUID.randomUUID().toString();
+        Resource policy = odrlModel.createResource(ODRL_NS + policyId);
+
+        // Set basic policy properties
+        policy.addProperty(RDF.type, policyResource);
+        policy.addProperty(groupProperty, odrlModel.createResource(ONTOSOV_NS + policyGroupId));
+
+        // Create permission
+        Resource permission = odrlModel.createResource();
+        permission.addProperty(RDF.type, permissionResource);
+
+        // Set entity target using Option A format: entity-Order-http://example.org/resource#Order/1
+        String targetId = "entity-" + entityType + "-" + entityId;
+        Resource target = odrlModel.createResource(ONTOSOV_NS + targetId);
+
+        // Add metadata to the target
+        target.addProperty(dataSourceProperty, dataSource);
+        target.addProperty(odrlModel.createProperty(ONTOSOV_NS, "entityType"), entityType);
+        target.addProperty(odrlModel.createProperty(ONTOSOV_NS, "entityId"), entityId);
+
+        permission.addProperty(targetProperty, target);
+
+        // Set action
+        Resource actionResource = odrlModel.createResource(ODRL_NS + action);
+        permission.addProperty(actionProperty, actionResource);
+
+        // Set assigner and assignee
+        permission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
+        permission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+
+        // Add constraints if they exist (inline logic)
+        if (constraints != null && !constraints.isEmpty()) {
+            Resource constraint = odrlModel.createResource();
+
+            if (constraints.containsKey("purpose") && constraints.get("purpose") != null &&
+                    !constraints.get("purpose").toString().isEmpty()) {
+                constraint.addProperty(purposeProperty, constraints.get("purpose").toString());
+            }
+
+            if (constraints.containsKey("expiration") && constraints.get("expiration") != null &&
+                    !constraints.get("expiration").toString().isEmpty()) {
+                constraint.addProperty(dateTimeProperty, constraints.get("expiration").toString());
+            }
+
+            // Only add constraint resource if it has properties
+            if (constraint.listProperties().hasNext()) {
+                permission.addProperty(constraintProperty, constraint);
+            }
+        }
+
+        // Add consequences if they exist (inline logic)
+        if (consequences != null && !consequences.isEmpty()) {
+            if (consequences.containsKey("notificationType") && consequences.get("notificationType") != null &&
+                    !consequences.get("notificationType").toString().isEmpty()) {
+                Resource duty = odrlModel.createResource();
+                duty.addProperty(RDF.type, dutyResource);
+                duty.addProperty(actionProperty, odrlModel.createResource(ODRL_NS + "notify"));
+                duty.addProperty(consequenceProperty, consequences.get("notificationType").toString());
+                permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), duty);
+            }
+
+            if (consequences.containsKey("compensationAmount") && consequences.get("compensationAmount") != null &&
+                    !consequences.get("compensationAmount").toString().isEmpty()) {
+                Resource compensationDuty = odrlModel.createResource();
+                compensationDuty.addProperty(RDF.type, dutyResource);
+                compensationDuty.addProperty(actionProperty, odrlModel.createResource(ODRL_NS + "compensate"));
+                compensationDuty.addProperty(compensationProperty, consequences.get("compensationAmount").toString());
+                permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), compensationDuty);
+            }
+        }
+
+        // Add the permission to the policy
+        policy.addProperty(odrlModel.createProperty(ODRL_NS, "permission"), permission);
+
+        // Handle AI restrictions (inline logic)
+        if (aiRestrictions != null && !aiRestrictions.isEmpty()) {
+            boolean allowAiTraining = true;
+            if (aiRestrictions.containsKey("allowAiTraining")) {
+                allowAiTraining = Boolean.parseBoolean(aiRestrictions.get("allowAiTraining").toString());
+            }
+
+            if (!allowAiTraining) {
+                // Create prohibition for AI training
+                Resource prohibition = odrlModel.createResource();
+                prohibition.addProperty(RDF.type, prohibitionResource);
+                prohibition.addProperty(targetProperty, target);
+                prohibition.addProperty(actionProperty, aiTrainingAction);
+                prohibition.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
+                prohibition.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+
+                policy.addProperty(odrlModel.createProperty(ODRL_NS, "prohibition"), prohibition);
+            } else if (aiRestrictions.containsKey("aiAlgorithm") &&
+                    !aiRestrictions.get("aiAlgorithm").toString().isEmpty()) {
+                // Create permission with algorithm constraint
+                Resource aiPermission = odrlModel.createResource();
+                aiPermission.addProperty(RDF.type, permissionResource);
+                aiPermission.addProperty(targetProperty, target);
+                aiPermission.addProperty(actionProperty, aiTrainingAction);
+                aiPermission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
+                aiPermission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+
+                // Add algorithm constraint
+                Resource algorithmConstraint = odrlModel.createResource();
+                algorithmConstraint.addProperty(leftOperandProperty, aiAlgorithmProperty);
+                algorithmConstraint.addProperty(operatorProperty, odrlModel.createLiteral("eq"));
+                algorithmConstraint.addProperty(rightOperandProperty, aiRestrictions.get("aiAlgorithm").toString());
+
+                aiPermission.addProperty(constraintProperty, algorithmConstraint);
+                policy.addProperty(odrlModel.createProperty(ODRL_NS, "permission"), aiPermission);
+            }
+        }
+    }
+
+    private String extractEntityTypeFromUri(String entityUri) {
+        // Extract entity type from URI like "http://example.org/resource#Order/1" -> "Order"
+        if (entityUri.contains("#")) {
+            String afterHash = entityUri.substring(entityUri.lastIndexOf('#') + 1);
+            if (afterHash.contains("/")) {
+                return afterHash.substring(0, afterHash.indexOf("/"));
+            }
+        }
+        return "Entity"; // Fallback
+    }
+
     private void removePoliciesForAssignment(String policyGroupId, PolicyAssignmentDTO assignment, Long subjectId) {
-        // Query to find all policies related to this assignment
+        // Query to find all policies related to this assignment (both property and entity)
         String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                 "PREFIX odrl: <" + ODRL_NS + ">\n" +
                 "PREFIX rdf: <" + RDF.getURI() + ">\n" +
@@ -316,6 +467,16 @@ public class ODRLService {
                 "          odrl:permission ?permission .\n" +
                 "  ?permission odrl:target ?target ;\n" +
                 "              odrl:assigner onto:subject-" + subjectId + " .\n" +
+                "  ?target onto:dataSource ?dataSource .\n" +
+                "  {\n" +
+                "    # Property policies\n" +
+                "    ?target onto:dataProperty ?dataProperty .\n" +
+                "  }\n" +
+                "  UNION\n" +
+                "  {\n" +
+                "    # Entity policies\n" +
+                "    ?target onto:entityId ?entityId .\n" +
+                "  }\n" +
                 "}";
 
         Query query = QueryFactory.create(queryString);
@@ -348,11 +509,10 @@ public class ODRLService {
         }
     }
 
-    public boolean checkAccess(Long subjectId, Long controllerId, String dataSource, String property, String action) {
+    public boolean checkPropertyAccess(Long subjectId, Long controllerId, String dataSource, String property, String action) {
         dataset.begin(ReadWrite.READ);
 
         try {
-            // Query to check if there's a policy allowing this access
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
@@ -378,23 +538,61 @@ public class ODRLService {
         }
     }
 
-    public Map<String, Set<String>> getAssignmentsForPolicyGroup(String groupId, Long subjectId) {
-        Map<String, Set<String>> result = new HashMap<>();
+    public boolean checkEntityAccess(Long subjectId, Long controllerId, String dataSource, String entityId, String action) {
         dataset.begin(ReadWrite.READ);
 
         try {
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
-                    "SELECT ?source ?property\n" +
+                    "ASK {\n" +
+                    "  ?policy rdf:type odrl:Policy .\n" +
+                    "  ?policy odrl:permission ?permission .\n" +
+                    "  ?permission odrl:target ?target ;\n" +
+                    "              odrl:action odrl:" + action + " ;\n" +
+                    "              odrl:assigner onto:subject-" + subjectId + " ;\n" +
+                    "              odrl:assignee ?assignee .\n" +
+                    "  ?target onto:dataSource \"" + dataSource + "\" ;\n" +
+                    "          onto:entityId \"" + entityId + "\" .\n" +
+                    "  FILTER(?assignee = onto:controller-" + controllerId + " || " +
+                    "         ?assignee = onto:allControllers)\n" +
+                    "}";
+
+            Query query = QueryFactory.create(queryString);
+            try (QueryExecution qexec = QueryExecutionFactory.create(query, odrlModel)) {
+                return qexec.execAsk();
+            }
+        } finally {
+            dataset.end();
+        }
+    }
+
+    public Map<String, Set<String>> getAssignmentsForPolicyGroup(String groupId, Long subjectId) {
+        Map<String, Set<String>> result = new HashMap<>();
+        dataset.begin(ReadWrite.READ);
+
+        try {
+            // Query for both property and entity assignments
+            String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
+                    "PREFIX odrl: <" + ODRL_NS + ">\n" +
+                    "PREFIX rdf: <" + RDF.getURI() + ">\n" +
+                    "SELECT ?source ?dataKey\n" +
                     "WHERE {\n" +
                     "  ?policy rdf:type odrl:Policy ;\n" +
                     "          onto:policyGroup onto:" + groupId + " ;\n" +
                     "          odrl:permission ?permission .\n" +
                     "  ?permission odrl:target ?target ;\n" +
                     "              odrl:assigner onto:subject-" + subjectId + " .\n" +
-                    "  ?target onto:dataSource ?source ;\n" +
-                    "          onto:dataProperty ?property .\n" +
+                    "  ?target onto:dataSource ?source .\n" +
+                    "  {\n" +
+                    "    # Property assignments\n" +
+                    "    ?target onto:dataProperty ?dataKey .\n" +
+                    "  }\n" +
+                    "  UNION\n" +
+                    "  {\n" +
+                    "    # Entity assignments\n" +
+                    "    ?target onto:entityId ?dataKey .\n" +
+                    "  }\n" +
                     "}";
 
             Query query = QueryFactory.create(queryString);
@@ -404,12 +602,12 @@ public class ODRLService {
                     QuerySolution solution = rs.next();
 
                     String source = solution.getLiteral("source").getString();
-                    String property = solution.getLiteral("property").getString();
+                    String dataKey = solution.getLiteral("dataKey").getString(); // property or entityId
 
                     if (!result.containsKey(source)) {
                         result.put(source, new HashSet<>());
                     }
-                    result.get(source).add(property);
+                    result.get(source).add(dataKey);
                 }
             }
 
@@ -420,8 +618,6 @@ public class ODRLService {
     }
 
     public void cleanupPoliciesForGroup(String groupId, Long subjectId) {
-        dataset.begin(ReadWrite.WRITE);
-
         try {
             // Only select policies related to this group
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
@@ -447,8 +643,7 @@ public class ODRLService {
                 }
             }
 
-            // Remove the policies and permissions, but NOT the targets
-            // since targets could be used by other policy groups
+            // Remove the policies and permissions
             for (Resource policy : policiesToRemove) {
                 odrlModel.removeAll(policy, null, null);
             }
@@ -457,12 +652,9 @@ public class ODRLService {
                 odrlModel.removeAll(permission, null, null);
             }
 
-            dataset.commit();
+            // No commit/abort here - let the caller handle it
         } catch (Exception e) {
-            dataset.abort();
             throw new RuntimeException("Failed to cleanup ODRL policies: " + e.getMessage(), e);
-        } finally {
-            dataset.end();
         }
     }
 
@@ -471,10 +663,11 @@ public class ODRLService {
         dataset.begin(ReadWrite.READ);
 
         try {
+            // Query for both property and entity policies using UNION
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
-                    "SELECT ?group ?source ?property ?action\n" +
+                    "SELECT ?group ?source ?dataKey ?action\n" +
                     "WHERE {\n" +
                     "  ?policy rdf:type odrl:Policy ;\n" +
                     "          onto:policyGroup ?group ;\n" +
@@ -482,8 +675,16 @@ public class ODRLService {
                     "  ?permission odrl:target ?target ;\n" +
                     "              odrl:action ?action ;\n" +
                     "              odrl:assigner onto:subject-" + subjectId + " .\n" +
-                    "  ?target onto:dataSource ?source ;\n" +
-                    "          onto:dataProperty ?property .\n" +
+                    "  ?target onto:dataSource ?source .\n" +
+                    "  {\n" +
+                    "    # Property policies\n" +
+                    "    ?target onto:dataProperty ?dataKey .\n" +
+                    "  }\n" +
+                    "  UNION\n" +
+                    "  {\n" +
+                    "    # Entity policies  \n" +
+                    "    ?target onto:entityId ?dataKey .\n" +
+                    "  }\n" +
                     "}";
 
             Query query = QueryFactory.create(queryString);
@@ -496,7 +697,7 @@ public class ODRLService {
                     String groupId = groupUri.substring(groupUri.lastIndexOf('/') + 1);
 
                     String source = solution.getLiteral("source").getString();
-                    String property = solution.getLiteral("property").getString();
+                    String dataKey = solution.getLiteral("dataKey").getString(); // property or entityId
                     String actionUri = solution.getResource("action").getURI();
 
                     // Extract action name without namespace
@@ -506,10 +707,10 @@ public class ODRLService {
                     } else if (actionUri.contains("/")) {
                         action = actionUri.substring(actionUri.lastIndexOf('/') + 1);
                     } else {
-                        action = actionUri; // Fallback case
+                        action = actionUri;
                     }
 
-                    // Make sure all levels of the map are initialized properly
+                    // Initialize nested maps
                     if (!result.containsKey(groupId)) {
                         result.put(groupId, new HashMap<>());
                     }
@@ -519,21 +720,21 @@ public class ODRLService {
                         sourceMap.put(source, new HashMap<>());
                     }
 
-                    Map<String, Set<String>> propertyMap = sourceMap.get(source);
-                    if (!propertyMap.containsKey(property)) {
-                        propertyMap.put(property, new HashSet<>());
+                    Map<String, Set<String>> dataKeyMap = sourceMap.get(source);
+                    if (!dataKeyMap.containsKey(dataKey)) {
+                        dataKeyMap.put(dataKey, new HashSet<>());
                     }
 
-                    // Now add the action
-                    propertyMap.get(property).add(action);
+                    // Add the action
+                    dataKeyMap.get(dataKey).add(action);
                 }
             }
 
-            // Also query for prohibitions (especially for AI training)
+            // Query for prohibitions (both property and entity)
             String prohibitionQuery = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
-                    "SELECT ?group ?source ?property ?action\n" +
+                    "SELECT ?group ?source ?dataKey ?action\n" +
                     "WHERE {\n" +
                     "  ?policy rdf:type odrl:Policy ;\n" +
                     "          onto:policyGroup ?group ;\n" +
@@ -541,8 +742,16 @@ public class ODRLService {
                     "  ?prohibition odrl:target ?target ;\n" +
                     "              odrl:action ?action ;\n" +
                     "              odrl:assigner onto:subject-" + subjectId + " .\n" +
-                    "  ?target onto:dataSource ?source ;\n" +
-                    "          onto:dataProperty ?property .\n" +
+                    "  ?target onto:dataSource ?source .\n" +
+                    "  {\n" +
+                    "    # Property policies\n" +
+                    "    ?target onto:dataProperty ?dataKey .\n" +
+                    "  }\n" +
+                    "  UNION\n" +
+                    "  {\n" +
+                    "    # Entity policies\n" +
+                    "    ?target onto:entityId ?dataKey .\n" +
+                    "  }\n" +
                     "}";
 
             Query prohibQuery = QueryFactory.create(prohibitionQuery);
@@ -555,20 +764,18 @@ public class ODRLService {
                     String groupId = groupUri.substring(groupUri.lastIndexOf('/') + 1);
 
                     String source = solution.getLiteral("source").getString();
-                    String property = solution.getLiteral("property").getString();
+                    String dataKey = solution.getLiteral("dataKey").getString();
                     String actionUri = solution.getResource("action").getURI();
 
-                    // Extract action name without namespace
                     String action;
                     if (actionUri.contains("#")) {
                         action = actionUri.substring(actionUri.lastIndexOf('#') + 1);
                     } else if (actionUri.contains("/")) {
                         action = actionUri.substring(actionUri.lastIndexOf('/') + 1);
                     } else {
-                        action = actionUri; // Fallback case
+                        action = actionUri;
                     }
 
-                    // For prohibitions, we'll add them with "prohibit-" prefix to distinguish
                     String prohibitAction = "prohibit-" + action;
 
                     // Initialize maps as needed
@@ -579,37 +786,26 @@ public class ODRLService {
                     if (!sourceMap.containsKey(source)) {
                         sourceMap.put(source, new HashMap<>());
                     }
-                    Map<String, Set<String>> propertyMap = sourceMap.get(source);
-                    if (!propertyMap.containsKey(property)) {
-                        propertyMap.put(property, new HashSet<>());
+                    Map<String, Set<String>> dataKeyMap = sourceMap.get(source);
+                    if (!dataKeyMap.containsKey(dataKey)) {
+                        dataKeyMap.put(dataKey, new HashSet<>());
                     }
 
-                    // Add the prohibition action
-                    propertyMap.get(property).add(prohibitAction);
+                    dataKeyMap.get(dataKey).add(prohibitAction);
                 }
             }
 
-            // For each policy group, fetch and add the constraints, consequences, and AI restrictions
+            // Add policy group metadata
             for (String groupId : result.keySet()) {
                 try {
-                    // Get the policy group details
-                    Resource policyGroup = odrlModel.getResource(ONTOSOV_NS + groupId);
-
-                    // We need to query from the policyModel in PolicyGroupService, not the odrlModel
-                    // Since this data is stored in a different way, we'll add special actions to the result
-                    // that will be interpreted by the UI
-
-                    // Add a special action with metadata about this policy group that the UI can use
                     for (Map<String, Map<String, Set<String>>> sourceMap : result.values()) {
-                        for (Map<String, Set<String>> propertyMap : sourceMap.values()) {
-                            for (Set<String> actions : propertyMap.values()) {
-                                // Add policy group ID as a special action
+                        for (Map<String, Set<String>> dataKeyMap : sourceMap.values()) {
+                            for (Set<String> actions : dataKeyMap.values()) {
                                 actions.add("__policyGroupId:" + groupId);
                             }
                         }
                     }
                 } catch (Exception e) {
-                    // Log error but continue processing
                     log.error("Error processing policy group details: " + e.getMessage(), e);
                 }
             }
