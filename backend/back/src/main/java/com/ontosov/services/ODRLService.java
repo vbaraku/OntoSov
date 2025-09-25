@@ -114,11 +114,10 @@ public class ODRLService {
 
     public void generatePoliciesFromAssignment(String policyGroupId, PolicyGroupDTO policyGroup,
                                                PolicyAssignmentDTO assignmentDTO, Long subjectId) {
-        dataset.begin(ReadWrite.WRITE);
-
+        // Work within the existing transaction - no dataset.begin/end here
         try {
             // Clear any existing policies for this group
-            cleanupPoliciesForGroup(policyGroupId, subjectId);
+            cleanupPoliciesForGroupInTransaction(policyGroupId, subjectId);
 
             // Handle property assignments
             if (assignmentDTO.getPropertyAssignments() != null) {
@@ -162,12 +161,8 @@ public class ODRLService {
                 }
             }
 
-            dataset.commit();
         } catch (Exception e) {
-            dataset.abort();
             throw new RuntimeException("Failed to generate ODRL policies: " + e.getMessage(), e);
-        } finally {
-            dataset.end();
         }
     }
 
@@ -567,16 +562,16 @@ public class ODRLService {
         }
     }
 
-    public Map<String, Set<String>> getAssignmentsForPolicyGroup(String groupId, Long subjectId) {
-        Map<String, Set<String>> result = new HashMap<>();
-        dataset.begin(ReadWrite.READ);
+    public Map<String, Object> getAssignmentsForPolicyGroup(String groupId, Long subjectId) {
+        Map<String, Set<String>> propertyAssignments = new HashMap<>();
+        Map<String, Set<String>> entityAssignments = new HashMap<>();
 
+        dataset.begin(ReadWrite.READ);
         try {
-            // Query for both property and entity assignments
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
-                    "SELECT ?source ?dataKey\n" +
+                    "SELECT ?source ?property ?entityId\n" +
                     "WHERE {\n" +
                     "  ?policy rdf:type odrl:Policy ;\n" +
                     "          onto:policyGroup onto:" + groupId + " ;\n" +
@@ -584,15 +579,8 @@ public class ODRLService {
                     "  ?permission odrl:target ?target ;\n" +
                     "              odrl:assigner onto:subject-" + subjectId + " .\n" +
                     "  ?target onto:dataSource ?source .\n" +
-                    "  {\n" +
-                    "    # Property assignments\n" +
-                    "    ?target onto:dataProperty ?dataKey .\n" +
-                    "  }\n" +
-                    "  UNION\n" +
-                    "  {\n" +
-                    "    # Entity assignments\n" +
-                    "    ?target onto:entityId ?dataKey .\n" +
-                    "  }\n" +
+                    "  OPTIONAL { ?target onto:dataProperty ?property }\n" +
+                    "  OPTIONAL { ?target onto:entityId ?entityId }\n" +
                     "}";
 
             Query query = QueryFactory.create(queryString);
@@ -600,26 +588,34 @@ public class ODRLService {
                 ResultSet rs = qexec.execSelect();
                 while (rs.hasNext()) {
                     QuerySolution solution = rs.next();
-
                     String source = solution.getLiteral("source").getString();
-                    String dataKey = solution.getLiteral("dataKey").getString(); // property or entityId
 
-                    if (!result.containsKey(source)) {
-                        result.put(source, new HashSet<>());
+                    // Check if this is a property assignment
+                    if (solution.contains("property")) {
+                        String property = solution.getLiteral("property").getString();
+                        propertyAssignments.computeIfAbsent(source, k -> new HashSet<>()).add(property);
                     }
-                    result.get(source).add(dataKey);
+
+                    // Check if this is an entity assignment
+                    if (solution.contains("entityId")) {
+                        String entityId = solution.getLiteral("entityId").getString();
+                        entityAssignments.computeIfAbsent(source, k -> new HashSet<>()).add(entityId);
+                    }
                 }
             }
 
+            Map<String, Object> result = new HashMap<>();
+            result.put("propertyAssignments", propertyAssignments);
+            result.put("entityAssignments", entityAssignments);
             return result;
+
         } finally {
             dataset.end();
         }
     }
 
-    public void cleanupPoliciesForGroup(String groupId, Long subjectId) {
+    public void cleanupPoliciesForGroupInTransaction(String groupId, Long subjectId) {
         try {
-            // Only select policies related to this group
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
                     "PREFIX odrl: <" + ODRL_NS + ">\n" +
                     "PREFIX rdf: <" + RDF.getURI() + ">\n" +
@@ -652,9 +648,21 @@ public class ODRLService {
                 odrlModel.removeAll(permission, null, null);
             }
 
-            // No commit/abort here - let the caller handle it
         } catch (Exception e) {
             throw new RuntimeException("Failed to cleanup ODRL policies: " + e.getMessage(), e);
+        }
+    }
+
+    public void cleanupPoliciesForGroup(String groupId, Long subjectId) {
+        dataset.begin(ReadWrite.WRITE);
+        try {
+            cleanupPoliciesForGroupInTransaction(groupId, subjectId);
+            dataset.commit();
+        } catch (Exception e) {
+            dataset.abort();
+            throw e;
+        } finally {
+            dataset.end();
         }
     }
 

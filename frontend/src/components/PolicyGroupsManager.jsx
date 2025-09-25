@@ -301,12 +301,76 @@ const PolicyGroupForm = React.memo(
 
 const AssignPolicyForm = React.memo(
   ({ data, onSave, onCancel, groupName, initialSelectedData = {} }) => {
-    const [selectedPropertyData, setSelectedPropertyData] = useState(
-      initialSelectedData.properties || {}
+    console.log(
+      "AssignPolicyForm render - initialSelectedData:",
+      initialSelectedData
     );
-    const [selectedEntityData, setSelectedEntityData] = useState(
-      initialSelectedData.entities || {}
-    );
+
+    const [selectedPropertyData, setSelectedPropertyData] = useState({});
+    const [selectedEntityData, setSelectedEntityData] = useState({});
+    const [initialized, setInitialized] = useState(false);
+
+    // Use a more controlled approach to avoid infinite re-renders
+    useEffect(() => {
+      console.log("useEffect triggered. Initialized:", initialized);
+      console.log("initialSelectedData:", initialSelectedData);
+
+      // Only initialize once or when we get actual data
+      if (
+        !initialized ||
+        (initialSelectedData && Object.keys(initialSelectedData).length > 0)
+      ) {
+        console.log("Initializing form data...");
+
+        // Handle properties
+        const propertyData = initialSelectedData.properties || {};
+        const normalizedPropertyData = {};
+
+        Object.entries(propertyData).forEach(([source, items]) => {
+          if (items instanceof Set) {
+            normalizedPropertyData[source] = items;
+          } else if (Array.isArray(items)) {
+            normalizedPropertyData[source] = new Set(items);
+          } else if (items && typeof items === "object") {
+            const selectedProps = Object.keys(items).filter(
+              (key) => items[key]
+            );
+            if (selectedProps.length > 0) {
+              normalizedPropertyData[source] = new Set(selectedProps);
+            }
+          }
+        });
+
+        // Handle entities
+        const entityData = initialSelectedData.entities || {};
+        const normalizedEntityData = {};
+
+        Object.entries(entityData).forEach(([source, items]) => {
+          if (items instanceof Set) {
+            normalizedEntityData[source] = items;
+          } else if (Array.isArray(items)) {
+            normalizedEntityData[source] = new Set(items);
+          } else if (items && typeof items === "object") {
+            const selectedEntities = Object.keys(items).filter(
+              (key) => items[key]
+            );
+            if (selectedEntities.length > 0) {
+              normalizedEntityData[source] = new Set(selectedEntities);
+            }
+          }
+        });
+
+        console.log(
+          "Setting normalized property data:",
+          normalizedPropertyData
+        );
+        console.log("Setting normalized entity data:", normalizedEntityData);
+
+        setSelectedPropertyData(normalizedPropertyData);
+        setSelectedEntityData(normalizedEntityData);
+        setInitialized(true);
+      }
+    }, [JSON.stringify(initialSelectedData), initialized]); // Use JSON.stringify to compare object content
 
     const togglePropertySelection = (source, property) => {
       setSelectedPropertyData((prev) => {
@@ -314,31 +378,19 @@ const AssignPolicyForm = React.memo(
 
         if (!newState[source]) {
           newState[source] = new Set([property]);
-          return newState;
-        }
-
-        if (newState[source] instanceof Set) {
-          if (newState[source].has(property)) {
-            newState[source].delete(property);
-            if (newState[source].size === 0) {
+        } else {
+          const newSet = new Set(newState[source]);
+          if (newSet.has(property)) {
+            newSet.delete(property);
+            if (newSet.size === 0) {
               delete newState[source];
+            } else {
+              newState[source] = newSet;
             }
           } else {
-            newState[source].add(property);
+            newSet.add(property);
+            newState[source] = newSet;
           }
-          return newState;
-        }
-
-        if (Array.isArray(newState[source])) {
-          if (newState[source].includes(property)) {
-            newState[source] = newState[source].filter((p) => p !== property);
-            if (newState[source].length === 0) {
-              delete newState[source];
-            }
-          } else {
-            newState[source] = [...newState[source], property];
-          }
-          return newState;
         }
 
         return newState;
@@ -351,31 +403,19 @@ const AssignPolicyForm = React.memo(
 
         if (!newState[source]) {
           newState[source] = new Set([entityId]);
-          return newState;
-        }
-
-        if (newState[source] instanceof Set) {
-          if (newState[source].has(entityId)) {
-            newState[source].delete(entityId);
-            if (newState[source].size === 0) {
+        } else {
+          const newSet = new Set(newState[source]);
+          if (newSet.has(entityId)) {
+            newSet.delete(entityId);
+            if (newSet.size === 0) {
               delete newState[source];
+            } else {
+              newState[source] = newSet;
             }
           } else {
-            newState[source].add(entityId);
+            newSet.add(entityId);
+            newState[source] = newSet;
           }
-          return newState;
-        }
-
-        if (Array.isArray(newState[source])) {
-          if (newState[source].includes(entityId)) {
-            newState[source] = newState[source].filter((e) => e !== entityId);
-            if (newState[source].length === 0) {
-              delete newState[source];
-            }
-          } else {
-            newState[source] = [...newState[source], entityId];
-          }
-          return newState;
         }
 
         return newState;
@@ -383,71 +423,39 @@ const AssignPolicyForm = React.memo(
     };
 
     const isPropertySelected = (source, property) => {
-      if (!selectedPropertyData[source]) return false;
-
-      if (selectedPropertyData[source] instanceof Set) {
-        return selectedPropertyData[source].has(property);
-      }
-
-      if (Array.isArray(selectedPropertyData[source])) {
-        return selectedPropertyData[source].includes(property);
-      }
-
-      return selectedPropertyData[source][property] === true;
+      return selectedPropertyData[source]?.has(property) || false;
     };
 
     const isEntitySelected = (source, entityId) => {
-      if (!selectedEntityData[source]) return false;
-
-      if (selectedEntityData[source] instanceof Set) {
-        return selectedEntityData[source].has(entityId);
-      }
-
-      if (Array.isArray(selectedEntityData[source])) {
-        return selectedEntityData[source].includes(entityId);
-      }
-
-      return selectedEntityData[source][entityId] === true;
+      return selectedEntityData[source]?.has(entityId) || false;
     };
 
     const handleSave = () => {
-      // Convert both to Arrays for the API
+      // Convert Sets back to Arrays for sending to backend
       const propertyAssignments = {};
       const entityAssignments = {};
 
-      Object.entries(selectedPropertyData).forEach(([source, value]) => {
-        if (value instanceof Set) {
-          propertyAssignments[source] = Array.from(value);
-        } else if (Array.isArray(value)) {
-          propertyAssignments[source] = [...value];
-        } else if (typeof value === "object") {
-          propertyAssignments[source] = Object.keys(value).filter(
-            (key) => value[key]
-          );
+      Object.entries(selectedPropertyData).forEach(([source, valueSet]) => {
+        if (valueSet.size > 0) {
+          propertyAssignments[source] = Array.from(valueSet);
         }
       });
 
-      Object.entries(selectedEntityData).forEach(([source, value]) => {
-        if (value instanceof Set) {
-          entityAssignments[source] = Array.from(value);
-        } else if (Array.isArray(value)) {
-          entityAssignments[source] = [...value];
-        } else if (typeof value === "object") {
-          entityAssignments[source] = Object.keys(value).filter(
-            (key) => value[key]
-          );
+      Object.entries(selectedEntityData).forEach(([source, valueSet]) => {
+        if (valueSet.size > 0) {
+          entityAssignments[source] = Array.from(valueSet);
         }
       });
 
+      console.log("Saving assignments:", {
+        propertyAssignments,
+        entityAssignments,
+      });
       onSave({ propertyAssignments, entityAssignments });
     };
 
     return (
       <Box sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Assign "{groupName}" policy to data elements
-        </Typography>
-
         {Object.entries(data).map(([source, sourceData]) => (
           <Card key={source} sx={{ mb: 2 }} variant="outlined">
             <CardContent>
@@ -866,59 +874,95 @@ const PolicyGroupsManager = ({
       cleanedId = cleanedId.substring(cleanedId.lastIndexOf("/") + 1);
     }
 
-    // Fetch current assignments for this policy group
     try {
       setLoading(true);
+
+      // Fetch current assignments
       const response = await fetch(
         `http://localhost:8080/api/policy-groups/${cleanedId}/assignments?subjectId=${userId}`
       );
 
+      let formattedAssignments = {
+        properties: {},
+        entities: {},
+      };
+
       if (response.ok) {
         const currentAssignments = await response.json();
+        console.log("Fetched current assignments:", currentAssignments);
 
-        // If we have initialSelectedData, merge it with current assignments
-        if (initialSelectedData) {
-          // Convert initialSelectedData to the format expected by the component
-          const formattedInitialData = {};
-
-          Object.entries(initialSelectedData).forEach(
+        // Handle the new backend format: {propertyAssignments: {...}, entityAssignments: {...}}
+        if (currentAssignments.propertyAssignments) {
+          Object.entries(currentAssignments.propertyAssignments).forEach(
             ([source, properties]) => {
-              if (Array.isArray(properties)) {
-                formattedInitialData[source] = new Set(properties);
-              } else {
-                formattedInitialData[source] = new Set([properties]);
+              if (properties && properties.length > 0) {
+                formattedAssignments.properties[source] = new Set(properties);
               }
             }
           );
+        }
 
-          // Merge with current assignments
-          const mergedData = { ...currentAssignments };
-
-          Object.entries(formattedInitialData).forEach(
-            ([source, properties]) => {
-              if (!mergedData[source]) {
-                mergedData[source] = new Set();
-              } else if (!(mergedData[source] instanceof Set)) {
-                // Convert to Set if it's not already
-                mergedData[source] = new Set(
-                  Array.isArray(mergedData[source])
-                    ? mergedData[source]
-                    : Object.keys(mergedData[source])
-                );
+        if (currentAssignments.entityAssignments) {
+          Object.entries(currentAssignments.entityAssignments).forEach(
+            ([source, entities]) => {
+              if (entities && entities.length > 0) {
+                formattedAssignments.entities[source] = new Set(entities);
               }
-
-              // Add each property
-              properties.forEach((prop) => mergedData[source].add(prop));
             }
           );
+        }
+      } else {
+        console.warn("Failed to fetch current assignments, starting fresh");
+      }
 
-          setSelectedData(mergedData);
-        } else {
-          setSelectedData(currentAssignments);
+      // Merge with initialSelectedData if provided (for context-specific assignment)
+      if (initialSelectedData) {
+        if (initialSelectedData.properties) {
+          Object.entries(initialSelectedData.properties).forEach(
+            ([source, properties]) => {
+              if (!formattedAssignments.properties[source]) {
+                formattedAssignments.properties[source] = new Set();
+              }
+              const propsToAdd = Array.isArray(properties)
+                ? properties
+                : [properties];
+              propsToAdd.forEach((prop) =>
+                formattedAssignments.properties[source].add(prop)
+              );
+            }
+          );
+        }
+
+        if (initialSelectedData.entities) {
+          Object.entries(initialSelectedData.entities).forEach(
+            ([source, entities]) => {
+              if (!formattedAssignments.entities[source]) {
+                formattedAssignments.entities[source] = new Set();
+              }
+              const entitiesToAdd = Array.isArray(entities)
+                ? entities
+                : [entities];
+              entitiesToAdd.forEach((entity) =>
+                formattedAssignments.entities[source].add(entity)
+              );
+            }
+          );
         }
       }
+
+      console.log(
+        "Final formatted assignments for form:",
+        formattedAssignments
+      );
+      setSelectedData(formattedAssignments);
     } catch (error) {
       console.error("Error fetching assignments:", error);
+      // Fallback to initialSelectedData or empty state
+      const fallbackData = initialSelectedData || {
+        properties: {},
+        entities: {},
+      };
+      setSelectedData(fallbackData);
     } finally {
       setLoading(false);
       setAssignDialogOpen(true);
@@ -1123,7 +1167,7 @@ const PolicyGroupsManager = ({
           <AssignPolicyForm
             data={data}
             groupName={selectedGroup?.name}
-            initialSelectedData={initialSelectedData}
+            initialSelectedData={selectedData}
             onSave={handleAssignData}
             onCancel={() => {
               setAssignDialogOpen(false);
