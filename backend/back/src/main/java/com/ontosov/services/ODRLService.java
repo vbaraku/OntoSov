@@ -618,8 +618,6 @@ public class ODRLService {
     }
 
     public void cleanupPoliciesForGroup(String groupId, Long subjectId) {
-        dataset.begin(ReadWrite.WRITE);
-
         try {
             // Only select policies related to this group
             String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
@@ -645,8 +643,7 @@ public class ODRLService {
                 }
             }
 
-            // Remove the policies and permissions, but NOT the targets
-            // since targets could be used by other policy groups
+            // Remove the policies and permissions
             for (Resource policy : policiesToRemove) {
                 odrlModel.removeAll(policy, null, null);
             }
@@ -655,12 +652,9 @@ public class ODRLService {
                 odrlModel.removeAll(permission, null, null);
             }
 
-            dataset.commit();
+            // No commit/abort here - let the caller handle it
         } catch (Exception e) {
-            dataset.abort();
             throw new RuntimeException("Failed to cleanup ODRL policies: " + e.getMessage(), e);
-        } finally {
-            dataset.end();
         }
     }
 

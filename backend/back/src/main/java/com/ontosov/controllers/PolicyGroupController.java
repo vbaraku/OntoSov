@@ -97,10 +97,12 @@ public class PolicyGroupController {
             @PathVariable String groupId,
             @RequestBody PolicyAssignmentDTO assignmentDTO,
             @RequestParam Long subjectId) {
+
         log.info("=== ASSIGNMENT REQUEST RECEIVED ===");
         log.info("Group ID: {}", groupId);
         log.info("Subject ID: {}", subjectId);
         log.info("Assignment DTO: {}", assignmentDTO);
+
         try {
             // Get the policy group details
             List<PolicyGroupDTO> groups = policyGroupService.getPolicyGroupsBySubject(subjectId);
@@ -109,14 +111,16 @@ public class PolicyGroupController {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Policy group not found"));
 
-            // This will now handle both property and entity assignments
+            // Assign data to policy and generate ODRL policies
             policyGroupService.assignDataToPolicy(groupId, assignmentDTO, subjectId);
             odrlService.generatePoliciesFromAssignment(groupId, policyGroup, assignmentDTO, subjectId);
 
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
+            log.error("Bad request in policy assignment: {}", e.getMessage(), e); // ADD THIS
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
+            log.error("Internal error in policy assignment: {}", e.getMessage(), e); // ADD THIS
             return ResponseEntity.internalServerError().build();
         }
     }
