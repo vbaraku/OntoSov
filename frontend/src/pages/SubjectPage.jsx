@@ -538,27 +538,57 @@ const SubjectPage = () => {
               </TableCell>
               <TableCell>{propertyText}</TableCell>
               <TableCell align="right">
-                {isProtected && (
-                  <Typography variant="body2" color="primary">
-                    Protected
-                  </Typography>
-                )}
+                {isProtected &&
+                  (() => {
+                    // Get actual policy info for entity (similar to properties)
+                    const entityPolicies = getEntityPolicyInfo(
+                      source,
+                      entity.entityId
+                    );
+                    let policyDisplay = "";
+
+                    if (entityPolicies.length === 1) {
+                      policyDisplay = entityPolicies[0].groupName;
+                    } else if (entityPolicies.length > 1) {
+                      policyDisplay = `${entityPolicies[0].groupName} (+${
+                        entityPolicies.length - 1
+                      })`;
+                    } else {
+                      policyDisplay = "Protected"; // fallback if policy info not found
+                    }
+
+                    return (
+                      <Typography variant="body2" color="primary">
+                        {policyDisplay}
+                      </Typography>
+                    );
+                  })()}
               </TableCell>
               <TableCell align="center">
                 <Tooltip
                   title={
-                    isProtected ? "Protected entity" : "Click to apply policy"
+                    isProtected
+                      ? "Protected entity - Click for details"
+                      : "Click to apply policy"
                   }
                 >
                   <IconButton
                     size="small"
-                    onClick={() =>
-                      handleApplyPolicyToEntity(
-                        source,
-                        entityType,
-                        entity.entityId
-                      )
-                    }
+                    onClick={() => {
+                      if (isProtected) {
+                        handleShowEntityPolicyDetails(
+                          source,
+                          entityType,
+                          entity.entityId
+                        );
+                      } else {
+                        handleApplyPolicyToEntity(
+                          source,
+                          entityType,
+                          entity.entityId
+                        );
+                      }
+                    }}
                   >
                     {isProtected ? (
                       <Lock fontSize="small" color="primary" />

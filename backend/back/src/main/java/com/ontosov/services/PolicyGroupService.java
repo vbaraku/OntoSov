@@ -502,6 +502,10 @@ public class PolicyGroupService {
                 throw new IllegalArgumentException("Policy group not found or access denied");
             }
 
+            // FIRST: Clean up related ODRL policies (before deleting the policy group)
+            // This needs to happen within the same transaction
+            odrlService.cleanupPoliciesForGroupInTransaction(groupId, subjectId);
+
             // Remove all data assignments for this group
             Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
             StmtIterator assignmentIterator = policyModel.listStatements(policyGroup, hasDataAssignmentProperty, (RDFNode) null);
@@ -514,10 +518,9 @@ public class PolicyGroupService {
             // Remove all statements about this policy group
             policyModel.removeAll(policyGroup, null, null);
 
+            // Now commit everything together
             dataset.commit();
 
-            // Also tell the ODRLService to clean up related ODRL policies
-            odrlService.cleanupPoliciesForGroup(groupId, subjectId);
         } catch (Exception e) {
             dataset.abort();
             throw new RuntimeException("Failed to delete policy group: " + e.getMessage(), e);
@@ -526,21 +529,22 @@ public class PolicyGroupService {
         }
     }
 
-    public void assignDataToPolicy(String groupId, PolicyAssignmentDTO assignmentDTO, Long subjectId) {
+    public void assignDataToPolicy(String groupId, PolicyAssignmentDTO assignmentDTO,
+                                   PolicyGroupDTO policyGroup, Long subjectId) {
         dataset.begin(ReadWrite.WRITE);
 
         try {
-            Resource policyGroup = policyModel.getResource(ONTOSOV_NS + groupId);
+            Resource policyGroupResource = policyModel.getResource(ONTOSOV_NS + groupId);
 
             // Check if group exists and belongs to the subject
-            if (!policyGroup.hasProperty(RDF.type, policyGroupClass) ||
-                    !policyGroup.hasProperty(ownerProperty, policyModel.createResource(ONTOSOV_NS + "subject-" + subjectId))) {
+            if (!policyGroupResource.hasProperty(RDF.type, policyGroupClass) ||
+                    !policyGroupResource.hasProperty(ownerProperty, policyModel.createResource(ONTOSOV_NS + "subject-" + subjectId))) {
                 throw new IllegalArgumentException("Policy group not found or access denied");
             }
 
             // Clear previous data assignments for this group
             Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
-            policyGroup.removeAll(hasDataAssignmentProperty);
+            policyGroupResource.removeAll(hasDataAssignmentProperty);
 
             // Create new property assignments
             if (assignmentDTO.getPropertyAssignments() != null) {
@@ -549,14 +553,11 @@ public class PolicyGroupService {
                     Set<String> properties = entry.getValue();
 
                     for (String property : properties) {
-                        // Create a resource representing this property assignment
                         Resource dataAssignment = policyModel.createResource();
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataProperty"), property);
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "property");
-
-                        // Link it to the policy group
-                        policyGroup.addProperty(hasDataAssignmentProperty, dataAssignment);
+                        policyGroupResource.addProperty(hasDataAssignmentProperty, dataAssignment);
                     }
                 }
             }
@@ -568,26 +569,26 @@ public class PolicyGroupService {
                     Set<String> entityIds = entry.getValue();
 
                     for (String entityId : entityIds) {
-                        // Create a resource representing this entity assignment
                         Resource dataAssignment = policyModel.createResource();
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "entityId"), entityId);
                         dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "entity");
-
-                        // Link it to the policy group
-                        policyGroup.addProperty(hasDataAssignmentProperty, dataAssignment);
+                        policyGroupResource.addProperty(hasDataAssignmentProperty, dataAssignment);
                     }
                 }
             }
 
             // Update modified timestamp
-            updateProperty(policyGroup, modifiedProperty,
+            updateProperty(policyGroupResource, modifiedProperty,
                     LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+            // Generate ODRL policies within the same transaction
+            odrlService.generatePoliciesFromAssignment(groupId, policyGroup, assignmentDTO, subjectId);
 
             dataset.commit();
         } catch (Exception e) {
             dataset.abort();
-            throw new RuntimeException("Failed to assign data to policy group: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to assign data and generate policies: " + e.getMessage(), e);
         } finally {
             dataset.end();
         }

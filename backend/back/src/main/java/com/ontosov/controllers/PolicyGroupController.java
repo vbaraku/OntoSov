@@ -104,36 +104,35 @@ public class PolicyGroupController {
         log.info("Assignment DTO: {}", assignmentDTO);
 
         try {
-            // Get the policy group details
+            // Get the policy group details first (outside transaction)
             List<PolicyGroupDTO> groups = policyGroupService.getPolicyGroupsBySubject(subjectId);
             PolicyGroupDTO policyGroup = groups.stream()
                     .filter(g -> g.getId().equals(groupId))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Policy group not found"));
 
-            // Assign data to policy and generate ODRL policies
-            policyGroupService.assignDataToPolicy(groupId, assignmentDTO, subjectId);
-            odrlService.generatePoliciesFromAssignment(groupId, policyGroup, assignmentDTO, subjectId);
+            // Do everything in one transaction
+            policyGroupService.assignDataToPolicy(groupId, assignmentDTO, policyGroup, subjectId);
 
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
-            log.error("Bad request in policy assignment: {}", e.getMessage(), e); // ADD THIS
+            log.error("Bad request in policy assignment: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            log.error("Internal error in policy assignment: {}", e.getMessage(), e); // ADD THIS
+            log.error("Internal error in policy assignment: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
 
     @GetMapping("/{groupId}/assignments")
-    public ResponseEntity<Map<String, Set<String>>> getPolicyGroupAssignments(
+    public ResponseEntity<Map<String, Object>> getPolicyGroupAssignments(
             @PathVariable String groupId,
             @RequestParam Long subjectId) {
         try {
-            Map<String, Set<String>> assignments = odrlService.getAssignmentsForPolicyGroup(groupId, subjectId);
+            Map<String, Object> assignments = odrlService.getAssignmentsForPolicyGroup(groupId, subjectId);
             return ResponseEntity.ok(assignments);
         } catch (Exception e) {
-            e.printStackTrace();  // Log the error for debugging
+            log.error("Error fetching assignments for group {}: {}", groupId, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
