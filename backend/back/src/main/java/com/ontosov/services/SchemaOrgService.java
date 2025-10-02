@@ -52,7 +52,7 @@ public class SchemaOrgService {
                         String className = uri.replace(SCHEMA_NS, "");
                         if (!className.endsWith("Enumeration") && !className.equals("DataType")) {
                             this.classesCache.add(className);
-                            System.out.println("Found class: " + className);
+                            // System.out.println("Found class: " + className);
                         }
                     }
                 }
@@ -79,14 +79,14 @@ public class SchemaOrgService {
                         this.classPropertiesCache
                                 .computeIfAbsent(className, k -> new HashSet<>())
                                 .add(propertyName);
-                        System.out.println("Added property " + propertyName + " to class " + className);
+                        // System.out.println("Added property " + propertyName + " to class " + className);
                     }
                 }
             }
 
-            System.out.println("\n=== Schema.org Data Loading Stats ===");
-            System.out.println("Classes in cache: " + this.classesCache.size());
-            System.out.println("Classes with properties: " + this.classPropertiesCache.size());
+//            System.out.println("\n=== Schema.org Data Loading Stats ===");
+//            System.out.println("Classes in cache: " + this.classesCache.size());
+//            System.out.println("Classes with properties: " + this.classPropertiesCache.size());
 
             if (this.classesCache.isEmpty()) {
                 System.out.println("\nWARNING: No classes were loaded!");

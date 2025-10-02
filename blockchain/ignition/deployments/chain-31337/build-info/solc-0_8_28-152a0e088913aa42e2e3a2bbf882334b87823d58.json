@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-152a0e088913aa42e2e3a2bbf882334b87823d58",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/PolicyRegistry.sol": "project/contracts/PolicyRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/PolicyRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n\r\ncontract PolicyRegistry {\r\n    \r\n    enum PolicyStatus { ACTIVE, DELETED }\r\n    \r\n    struct PolicyVersion {\r\n        bytes32 policyHash;\r\n        uint256 versionNumber;\r\n        uint256 timestamp;\r\n        PolicyStatus status;\r\n    }\r\n    \r\n    // Mapping: subjectAddress => policyGroupId => version => PolicyVersion\r\n    mapping(address => mapping(string => mapping(uint256 => PolicyVersion))) public policies;\r\n    \r\n    // Mapping: subjectAddress => policyGroupId => currentVersion\r\n    mapping(address => mapping(string => uint256)) public currentVersion;\r\n    \r\n    // Events\r\n    event PolicyRecorded(\r\n        address indexed subject,\r\n        string policyGroupId,\r\n        uint256 version,\r\n        bytes32 policyHash,\r\n        uint256 timestamp\r\n    );\r\n    \r\n    event PolicyDeleted(\r\n        address indexed subject,\r\n        string policyGroupId,\r\n        uint256 version,\r\n        uint256 timestamp\r\n    );\r\n    \r\n    /**\r\n     * Record a new policy or policy update\r\n     */\r\n    function recordPolicy(\r\n        address subject,\r\n        string memory policyGroupId,\r\n        bytes32 policyHash\r\n    ) public returns (uint256) {\r\n        // Increment version (starts from 1)\r\n        uint256 newVersion = currentVersion[subject][policyGroupId] + 1;\r\n        \r\n        // Create new policy version\r\n        policies[subject][policyGroupId][newVersion] = PolicyVersion({\r\n            policyHash: policyHash,\r\n            versionNumber: newVersion,\r\n            timestamp: block.timestamp,\r\n            status: PolicyStatus.ACTIVE\r\n        });\r\n        \r\n        // Update current version pointer\r\n        currentVersion[subject][policyGroupId] = newVersion;\r\n        \r\n        emit PolicyRecorded(subject, policyGroupId, newVersion, policyHash, block.timestamp);\r\n        \r\n        return newVersion;\r\n    }\r\n    \r\n    /**\r\n     * Mark a policy as deleted (doesn't actually delete - preserves history)\r\n     */\r\n    function deletePolicy(\r\n        address subject,\r\n        string memory policyGroupId\r\n    ) public {\r\n        uint256 version = currentVersion[subject][policyGroupId];\r\n        require(version > 0, \"Policy does not exist\");\r\n        \r\n        // Mark as deleted\r\n        policies[subject][policyGroupId][version].status = PolicyStatus.DELETED;\r\n        \r\n        emit PolicyDeleted(subject, policyGroupId, version, block.timestamp);\r\n    }\r\n    \r\n    /**\r\n     * Get a specific policy version\r\n     */\r\n    function getPolicy(\r\n        address subject,\r\n        string memory policyGroupId,\r\n        uint256 version\r\n    ) public view returns (\r\n        bytes32 policyHash,\r\n        uint256 versionNumber,\r\n        uint256 timestamp,\r\n        PolicyStatus status\r\n    ) {\r\n        PolicyVersion memory policy = policies[subject][policyGroupId][version];\r\n        return (\r\n            policy.policyHash,\r\n            policy.versionNumber,\r\n            policy.timestamp,\r\n            policy.status\r\n        );\r\n    }\r\n    \r\n    /**\r\n     * Get the current version number for a policy\r\n     */\r\n    function getCurrentVersion(\r\n        address subject,\r\n        string memory policyGroupId\r\n    ) public view returns (uint256) {\r\n        return currentVersion[subject][policyGroupId];\r\n    }\r\n}"
+      }
+    }
+  }
+}
