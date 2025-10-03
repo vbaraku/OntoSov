@@ -58,7 +58,7 @@ public class ControllerAccessController {
                         request.getAction(),
                         decision.getResult().name().equals("PERMIT"),
                         decision.getPolicyGroupId(),
-                        decision.getPolicyVersion() != null ? decision.getPolicyVersion() : java.math.BigInteger.ZERO
+                        decision.getPolicyVersion() != null ? java.math.BigInteger.valueOf(decision.getPolicyVersion()) : java.math.BigInteger.ZERO
                 );
 
                 if (txHash != null) {
