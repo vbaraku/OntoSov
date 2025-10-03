@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-dac4ece784776e650d2d41b8e55511f0876f4780",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/AccessLogger.sol": "project/contracts/AccessLogger.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/AccessLogger.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n\r\ncontract AccessLogger {\r\n    \r\n    struct AccessLogEntry {\r\n        address controller;\r\n        address subject;\r\n        bytes32 purposeHash;      // Hashed for privacy\r\n        string action;\r\n        bool permitted;\r\n        string policyGroupId;\r\n        uint256 policyVersion;\r\n        uint256 timestamp;\r\n    }\r\n    \r\n    // Array of all access logs\r\n    AccessLogEntry[] public logs;\r\n    \r\n    // Mappings for efficient querying\r\n    mapping(address => uint256[]) public logsByController;\r\n    mapping(address => uint256[]) public logsBySubject;\r\n    \r\n    // Events\r\n    event AccessLogged(\r\n        uint256 indexed logIndex,\r\n        address indexed controller,\r\n        address indexed subject,\r\n        string action,\r\n        bool permitted,\r\n        uint256 timestamp\r\n    );\r\n    \r\n    /**\r\n     * Log an access attempt\r\n     */\r\n    function logAccess(\r\n        address controller,\r\n        address subject,\r\n        bytes32 purposeHash,\r\n        string memory action,\r\n        bool permitted,\r\n        string memory policyGroupId,\r\n        uint256 policyVersion\r\n    ) public returns (uint256) {\r\n        // Create new log entry\r\n        AccessLogEntry memory newLog = AccessLogEntry({\r\n            controller: controller,\r\n            subject: subject,\r\n            purposeHash: purposeHash,\r\n            action: action,\r\n            permitted: permitted,\r\n            policyGroupId: policyGroupId,\r\n            policyVersion: policyVersion,\r\n            timestamp: block.timestamp\r\n        });\r\n        \r\n        // Add to logs array\r\n        logs.push(newLog);\r\n        uint256 logIndex = logs.length - 1;\r\n        \r\n        // Update mappings for efficient querying\r\n        logsByController[controller].push(logIndex);\r\n        logsBySubject[subject].push(logIndex);\r\n        \r\n        emit AccessLogged(logIndex, controller, subject, action, permitted, block.timestamp);\r\n        \r\n        return logIndex;\r\n    }\r\n    \r\n    /**\r\n     * Get a specific log entry\r\n     */\r\n    function getLog(uint256 index) public view returns (\r\n        address controller,\r\n        address subject,\r\n        bytes32 purposeHash,\r\n        string memory action,\r\n        bool permitted,\r\n        string memory policyGroupId,\r\n        uint256 policyVersion,\r\n        uint256 timestamp\r\n    ) {\r\n        require(index < logs.length, \"Log does not exist\");\r\n        AccessLogEntry memory log = logs[index];\r\n        return (\r\n            log.controller,\r\n            log.subject,\r\n            log.purposeHash,\r\n            log.action,\r\n            log.permitted,\r\n            log.policyGroupId,\r\n            log.policyVersion,\r\n            log.timestamp\r\n        );\r\n    }\r\n    \r\n    /**\r\n     * Get total number of logs\r\n     */\r\n    function getLogCount() public view returns (uint256) {\r\n        return logs.length;\r\n    }\r\n    \r\n    /**\r\n     * Get all log indices for a controller\r\n     */\r\n    function getControllerLogs(address controller) public view returns (uint256[] memory) {\r\n        return logsByController[controller];\r\n    }\r\n    \r\n    /**\r\n     * Get all log indices for a subject\r\n     */\r\n    function getSubjectLogs(address subject) public view returns (uint256[] memory) {\r\n        return logsBySubject[subject];\r\n    }\r\n}"
+      }
+    }
+  }
+}

@@ -49,6 +49,8 @@ public class PolicyGroupService {
 
     @Autowired
     private ODRLService odrlService;
+    @Autowired
+    private BlockchainService blockchainService;
 
     public PolicyGroupService(@Value("${ontosov.triplestore.path:src/main/resources/triplestore}") String triplestorePath) {
         // Create directory if it doesn't exist
@@ -183,6 +185,13 @@ public class PolicyGroupService {
                 }
 
                 policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
+            }
+            // Record policy on blockchain
+            try {
+                recordPolicyOnBlockchain(policyGroupId, policyModel, subjectId);
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to record policy on blockchain: " + e.getMessage());
+                // Don't fail the whole operation if blockchain fails
             }
 
             dataset.commit();
@@ -480,6 +489,12 @@ public class PolicyGroupService {
 
                 policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
             }
+            // Record updated policy on blockchain
+            try {
+                recordPolicyOnBlockchain(groupId, policyModel, subjectId);
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to record policy update on blockchain: " + e.getMessage());
+            }
 
             dataset.commit();
         } catch (Exception e) {
@@ -520,6 +535,15 @@ public class PolicyGroupService {
 
             // Now commit everything together
             dataset.commit();
+
+            // Mark policy as deleted on blockchain
+            try {
+                String subjectAddress = "0x" + String.format("%040x", subjectId);
+                blockchainService.deletePolicy(subjectAddress, groupId);
+                System.out.println("Policy marked as deleted on blockchain: " + groupId);
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to mark policy as deleted on blockchain: " + e.getMessage());
+            }
 
         } catch (Exception e) {
             dataset.abort();
@@ -598,6 +622,53 @@ public class PolicyGroupService {
         resource.removeAll(property);
         if (value != null && !value.isEmpty()) {
             resource.addProperty(property, value);
+        }
+    }
+
+    /**
+     * Record a policy on the blockchain
+     */
+    private void recordPolicyOnBlockchain(String policyGroupId, Model policyModel, Long subjectId) {
+        try {
+            // Get the policy group resource
+            Resource policyGroup = policyModel.getResource(ONTOSOV_NS + policyGroupId);
+
+            // Serialize the policy to a string for hashing
+            StringBuilder policyContent = new StringBuilder();
+            policyContent.append("PolicyGroup:").append(policyGroupId).append(";");
+
+            // Add permissions
+            StmtIterator permIter = policyGroup.listProperties(permissionProperty);
+            while (permIter.hasNext()) {
+                Statement stmt = permIter.next();
+                policyContent.append(stmt.toString()).append(";");
+            }
+
+            // Add constraints
+            Statement constraintStmt = policyGroup.getProperty(constraintProperty);
+            if (constraintStmt != null) {
+                policyContent.append(constraintStmt.toString()).append(";");
+            }
+
+            // Calculate hash
+            byte[] policyHash = blockchainService.hashPolicy(policyContent.toString());
+
+            // Generate blockchain address for subject (simplified - using subject ID)
+            // In production, you'd have a proper mapping of subject ID to blockchain address
+            String subjectAddress = "0x" + String.format("%040x", subjectId);
+
+            // Record on blockchain
+            String txHash = blockchainService.recordPolicy(subjectAddress, policyGroupId, policyHash);
+
+            if (txHash != null) {
+                System.out.println("Policy recorded on blockchain. TX: " + txHash);
+            } else {
+                System.err.println("Failed to record policy on blockchain");
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error recording policy on blockchain: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
