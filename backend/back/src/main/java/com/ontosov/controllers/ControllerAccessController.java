@@ -6,6 +6,7 @@ import com.ontosov.models.AccessLog;
 import com.ontosov.models.User;
 import com.ontosov.repositories.AccessLogRepo;
 import com.ontosov.repositories.UserRepo;
+import com.ontosov.services.BlockchainService;
 import com.ontosov.services.PolicyEvaluationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,10 @@ public class ControllerAccessController {
     @Autowired
     private UserRepo userRepo;
 
+    @Autowired
+    private BlockchainService blockchainService;
+
+
     /**
      * Endpoint for controllers to check if access is permitted
      * This is the main "Policy Checker" endpoint
@@ -39,9 +44,31 @@ public class ControllerAccessController {
 
             // 2. Log the access attempt to database
             AccessLog log = createAccessLog(request, decision);
-            accessLogRepo.save(log);
+            AccessLog savedLog = accessLogRepo.save(log);
 
-            // 3. TODO: Log to blockchain (will add later)
+            // 3. Log to blockchain
+            try {
+                String controllerAddress = "0x" + String.format("%040x", request.getControllerId());
+                String subjectAddress = "0x" + String.format("%040x", savedLog.getSubjectId());
+
+                String txHash = blockchainService.logAccess(
+                        controllerAddress,
+                        subjectAddress,
+                        request.getPurpose() != null ? request.getPurpose() : "",
+                        request.getAction(),
+                        decision.getResult().name().equals("PERMIT"),
+                        decision.getPolicyGroupId(),
+                        decision.getPolicyVersion() != null ? decision.getPolicyVersion() : java.math.BigInteger.ZERO
+                );
+
+                if (txHash != null) {
+                    savedLog.setBlockchainTxHash(txHash);
+                    accessLogRepo.save(savedLog);
+                    System.out.println("Access logged to blockchain. TX: " + txHash);
+                }
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to log to blockchain: " + e.getMessage());
+            }
 
             // 4. Return the decision
             return ResponseEntity.ok(decision);

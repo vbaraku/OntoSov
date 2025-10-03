@@ -171,6 +171,40 @@ public class BlockchainService {
     }
 
     /**
+     * Mark a policy as deleted on the blockchain
+     */
+    public String deletePolicy(String subjectAddress, String policyGroupId) {
+        try {
+            Function function = new Function(
+                    "deletePolicy",
+                    Arrays.asList(
+                            new Address(subjectAddress),
+                            new Utf8String(policyGroupId)
+                    ),
+                    Collections.emptyList()
+            );
+
+            String encodedFunction = FunctionEncoder.encode(function);
+
+            EthSendTransaction transactionResponse = transactionManager.sendTransaction(
+                    DefaultGasProvider.GAS_PRICE,
+                    DefaultGasProvider.GAS_LIMIT,
+                    POLICY_REGISTRY_ADDRESS,
+                    encodedFunction,
+                    BigInteger.ZERO
+            );
+
+            String txHash = transactionResponse.getTransactionHash();
+            System.out.println("Policy deleted on blockchain. TX: " + txHash);
+            return txHash;
+
+        } catch (Exception e) {
+            System.err.println("Error deleting policy on blockchain: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Helper: Hash a string to bytes32 using SHA-256
      */
     private byte[] hashString(String input) {
