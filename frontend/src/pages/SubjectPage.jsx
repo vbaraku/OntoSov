@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../components/AuthContext";
 import PolicyGroupsManager from "../components/PolicyGroupsManager";
 import PolicyDetailsDialog from "../components/PolicyDetailsDialog";
+import SubjectAccessHistory from "../components/SubjectAccessHistory";
 import {
   Box,
   Typography,
@@ -14,11 +15,9 @@ import {
   Paper,
   Card,
   CardContent,
-  CardHeader,
   IconButton,
   Tooltip,
   Grid,
-  Stack,
   Chip,
   CircularProgress,
   Alert,
@@ -33,23 +32,21 @@ import {
   Tab,
   tableCellClasses,
   styled,
-  Divider,
 } from "@mui/material";
 import {
   Lock,
   LockOpen,
   Security,
   Search,
-  Visibility,
-  Storage,
-  BarChart,
-  MoreVert,
-  DataUsage,
-  FilterList,
+  DataUsage as DataUsageIcon,
+  History as HistoryIcon,
+  Business as BusinessIcon,
+  Person as PersonIcon,
+  Receipt as ReceiptIcon,
 } from "@mui/icons-material";
 import AddModeratorIcon from "@mui/icons-material/AddModerator";
 
-// Styled components for enhanced visuals
+// Styled components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
     backgroundColor: theme.palette.primary.light,
@@ -94,6 +91,21 @@ const ProgressBar = ({ value, color = "primary" }) => (
   </Box>
 );
 
+// TabPanel component
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`subject-tabpanel-${index}`}
+      aria-labelledby={`subject-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
 const SubjectPage = () => {
   const { user } = useContext(AuthContext);
   const [data, setData] = useState({});
@@ -108,6 +120,7 @@ const SubjectPage = () => {
   const [searchTerms, setSearchTerms] = useState({});
   const [filterTabs, setFilterTabs] = useState({});
   const [selectedDataForPolicy, setSelectedDataForPolicy] = useState(null);
+  const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -181,7 +194,6 @@ const SubjectPage = () => {
     }
   };
 
-  // Helper to check if property is protected
   const isPropertyProtected = (source, property) => {
     for (const groupId in policyStatus) {
       const sourceMap = policyStatus[groupId];
@@ -192,7 +204,6 @@ const SubjectPage = () => {
     return false;
   };
 
-  // Helper functions for entity-level privacy
   const isEntityProtected = (source, entityType, entityId) => {
     for (const groupId in policyStatus) {
       const sourceMap = policyStatus[groupId];
@@ -213,7 +224,6 @@ const SubjectPage = () => {
     setPolicyDialogOpen(true);
   };
 
-  // Helper to get policy info
   const getPolicyInfo = (source, property) => {
     const policies = [];
     for (const groupId in policyStatus) {
@@ -245,7 +255,6 @@ const SubjectPage = () => {
         }
       }
     }
-
     return policies;
   };
 
@@ -274,14 +283,17 @@ const SubjectPage = () => {
     }));
   };
 
-  const handleTabChange = (source, tab) => {
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  const handleFilterTabChange = (source, tab) => {
     setFilterTabs((prev) => ({
       ...prev,
       [source]: tab,
     }));
   };
 
-  // Helper to format source name
   const formatSourceName = (source) => {
     const parts = source.split(" - ");
     if (parts.length === 2) {
@@ -316,7 +328,6 @@ const SubjectPage = () => {
 
   const getEntityPolicyInfo = (source, entityId) => {
     const policies = [];
-
     for (const groupId in policyStatus) {
       const sourceMap = policyStatus[groupId];
       if (sourceMap && sourceMap[source] && sourceMap[source][entityId]) {
@@ -346,11 +357,9 @@ const SubjectPage = () => {
         }
       }
     }
-
     return policies;
   };
 
-  // Calculate overall protection stats
   const calculateProtectionStats = () => {
     let totalFields = 0;
     let protectedFields = 0;
@@ -358,14 +367,12 @@ const SubjectPage = () => {
     Object.entries(data).forEach(([source, sourceData]) => {
       Object.entries(sourceData).forEach(([entityType, entityData]) => {
         if (entityType === "Person") {
-          // Count Person properties
           const personProperties = Object.keys(entityData);
           totalFields += personProperties.length;
           protectedFields += personProperties.filter((property) =>
             isPropertyProtected(source, property)
           ).length;
         } else {
-          // Count entity records
           if (Array.isArray(entityData)) {
             totalFields += entityData.length;
             protectedFields += entityData.filter((entity) =>
@@ -384,29 +391,15 @@ const SubjectPage = () => {
     };
   };
 
-  // Render all data in a single table with proper separation
-  const renderSourceDataAsTable = (
-    source,
-    sourceData,
-    searchTerm,
-    filterTab
-  ) => {
+  const renderSourceDataAsTable = (source, sourceData, searchTerm, filterTab) => {
     const rows = [];
 
     // 1. Person data first (property-level privacy)
     if (sourceData.Person) {
-      // Add section header
       rows.push(
-        <StyledTableRow
-          key="person-header"
-          sx={{ backgroundColor: "primary.50" }}
-        >
+        <StyledTableRow key="person-header" sx={{ backgroundColor: "primary.50" }}>
           <StyledTableCell colSpan={4}>
-            <Typography
-              variant="subtitle2"
-              fontWeight="bold"
-              color="primary.main"
-            >
+            <Typography variant="subtitle2" fontWeight="bold" color="primary.main">
               Personal Information
             </Typography>
           </StyledTableCell>
@@ -484,18 +477,10 @@ const SubjectPage = () => {
     );
 
     if (transactionalEntityTypes.length > 0) {
-      // Add section header
       rows.push(
-        <StyledTableRow
-          key="transactional-header"
-          sx={{ backgroundColor: "secondary.50" }}
-        >
+        <StyledTableRow key="transactional-header" sx={{ backgroundColor: "secondary.50" }}>
           <StyledTableCell colSpan={4}>
-            <Typography
-              variant="subtitle2"
-              fontWeight="bold"
-              color="secondary.main"
-            >
+            <Typography variant="subtitle2" fontWeight="bold" color="secondary.main">
               Transactional Data
             </Typography>
           </StyledTableCell>
@@ -521,7 +506,6 @@ const SubjectPage = () => {
           if (filterTab === 1 && !isProtected) return;
           if (filterTab === 2 && isProtected) return;
 
-          // Create a single row with all properties
           const propertyText = Object.entries(entity.properties)
             .map(([prop, val]) => `${prop}: ${val}`)
             .join(" • ");
@@ -540,7 +524,6 @@ const SubjectPage = () => {
               <TableCell align="right">
                 {isProtected &&
                   (() => {
-                    // Get actual policy info for entity (similar to properties)
                     const entityPolicies = getEntityPolicyInfo(
                       source,
                       entity.entityId
@@ -554,7 +537,7 @@ const SubjectPage = () => {
                         entityPolicies.length - 1
                       })`;
                     } else {
-                      policyDisplay = "Protected"; // fallback if policy info not found
+                      policyDisplay = "Protected";
                     }
 
                     return (
@@ -685,7 +668,6 @@ const SubjectPage = () => {
                     backgroundClip: "text",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
-                    textFillColor: "transparent",
                   }}
                 >
                   Personal Data Dashboard
@@ -698,279 +680,317 @@ const SubjectPage = () => {
             <Grid item>
               <Button
                 variant="contained"
-                color="primary"
                 startIcon={<AddModeratorIcon />}
                 onClick={() => setPolicyDialogOpen(true)}
-                sx={{
-                  px: 3,
-                  py: 1,
-                  borderRadius: 2,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                }}
+                size="large"
+                sx={{ boxShadow: 2 }}
               >
-                Manage Policies
+                Create Policy
               </Button>
             </Grid>
           </Grid>
         </Box>
 
-        {/* Protection Summary */}
-        <Card variant="outlined" sx={{ mb: 3 }}>
-          <CardContent>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6">Protection Summary</Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Overall data protection status
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-                  <DataUsage color="primary" sx={{ fontSize: 40, mr: 2 }} />
-                  <Box>
-                    <Typography variant="body2">
+        {/* Tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+          <Tabs
+            value={currentTab}
+            onChange={handleTabChange}
+            aria-label="subject tabs"
+          >
+            <Tab
+              icon={<DataUsageIcon />}
+              label="My Data"
+              iconPosition="start"
+            />
+            <Tab
+              icon={<HistoryIcon />}
+              label="Access History"
+              iconPosition="start"
+            />
+          </Tabs>
+        </Box>
+
+        {/* Tab 1: My Data */}
+        <TabPanel value={currentTab} index={0}>
+          {/* Protection Summary - Horizontal layout */}
+          <Card sx={{ mb: 3, boxShadow: 2 }}>
+            <CardContent sx={{ py: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                {/* Left side - Title */}
+                <Box sx={{ minWidth: 200 }}>
+                  <Typography variant="h6">
+                    Protection Summary
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Overall data protection status
+                  </Typography>
+                </Box>
+                
+                {/* Vertical divider */}
+                <Box
+                  sx={{
+                    width: 2,
+                    height: 50,
+                    bgcolor: "grey.300",
+                    borderRadius: 1,
+                  }}
+                />
+                
+                {/* Right side - Progress indicator */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+                  <Box
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: "50%",
+                      border: 3,
+                      borderColor: protectionPercentage >= 75 ? "success.main" : protectionPercentage >= 50 ? "warning.main" : "error.main",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Typography variant="body1" fontWeight="bold">
+                      {protectionPercentage}%
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
                       {protectedFields} of {totalFields} items protected
                     </Typography>
-                    <ProgressBar
+                    <LinearProgress
+                      variant="determinate"
                       value={protectionPercentage}
                       color={
-                        protectionPercentage > 70
+                        protectionPercentage >= 75
                           ? "success"
-                          : protectionPercentage > 30
+                          : protectionPercentage >= 50
                           ? "warning"
                           : "error"
                       }
+                      sx={{ height: 6, borderRadius: 5 }}
                     />
                   </Box>
                 </Box>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+              </Box>
+            </CardContent>
+          </Card>
 
-        {Object.entries(data).length === 0 ? (
-          <Alert severity="info">
-            No personal data found. This could be because your tax ID is not
-            recognized by any controllers, or there might be an issue connecting
-            to the data sources.
-          </Alert>
-        ) : (
-          <Grid container spacing={3}>
-            {Object.entries(data).map(([source, sourceData]) => {
-              // Calculate stats for this source
-              let totalItems = 0;
-              let protectedItems = 0;
+          {/* Data Display */}
+          {Object.keys(data).length === 0 && (
+            <Alert severity="info">
+              No data available. Connect databases to see your personal information.
+            </Alert>
+          )}
 
-              Object.entries(sourceData).forEach(([entityType, entityData]) => {
-                if (entityType === "Person") {
-                  const personProperties = Object.keys(entityData);
-                  totalItems += personProperties.length;
-                  protectedItems += personProperties.filter((property) =>
-                    isPropertyProtected(source, property)
-                  ).length;
-                } else {
-                  if (Array.isArray(entityData)) {
-                    totalItems += entityData.length;
-                    protectedItems += entityData.filter((entity) =>
+          {Object.keys(data).length > 0 && (
+            <Grid container spacing={2}>
+              {Object.entries(data).map(([source, sourceData]) => {
+                const searchTerm = searchTerms[source] || "";
+                const filterTab = filterTabs[source] || 0;
+
+                // Calculate per-source stats
+                let sourceTotal = 0;
+                let sourceProtected = 0;
+                
+                Object.entries(sourceData).forEach(([entityType, entityData]) => {
+                  if (entityType === "Person") {
+                    const personProperties = Object.keys(entityData);
+                    sourceTotal += personProperties.length;
+                    sourceProtected += personProperties.filter((property) =>
+                      isPropertyProtected(source, property)
+                    ).length;
+                  } else if (Array.isArray(entityData)) {
+                    sourceTotal += entityData.length;
+                    sourceProtected += entityData.filter((entity) =>
                       isEntityProtected(source, entityType, entity.entityId)
                     ).length;
                   }
-                }
-              });
+                });
 
-              const protectionPercentage =
-                totalItems > 0 ? (protectedItems / totalItems) * 100 : 0;
-              const searchTerm = searchTerms[source] || "";
-              const filterTab = filterTabs[source] || 0;
+                const sourceProtectionPercent = sourceTotal > 0 
+                  ? Math.round((sourceProtected / sourceTotal) * 100) 
+                  : 0;
 
-              return (
-                <Grid item xs={12} key={source}>
-                  <Card
-                    sx={{
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <CardHeader
-                      title={formatSourceName(source)}
-                      sx={{ pb: 0 }}
-                    />
-
-                    <CardContent sx={{ pt: 1, pb: 1 }}>
-                      <Stack
-                        direction="row"
-                        spacing={2}
-                        alignItems="center"
-                        sx={{ mb: 2 }}
-                      >
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Storage color="primary" sx={{ mr: 1 }} />
-                          <Typography variant="body2" color="text.secondary">
-                            {totalItems} data items
+                return (
+                  <Grid item xs={12} key={source}>
+                    <Card sx={{ boxShadow: 2 }}>
+                      <CardContent>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
+                          <BusinessIcon color="action" sx={{ fontSize: 28 }} />
+                          <Typography variant="h6" fontWeight="600">
+                            {formatSourceName(source)}
                           </Typography>
                         </Box>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Lock color="primary" sx={{ mr: 1 }} />
+                        
+                        {/* Inline stats */}
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <DataUsageIcon fontSize="small" color="action" />
+                            <Typography variant="body2" color="text.secondary">
+                              {sourceTotal} data items
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">|</Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <Lock fontSize="small" color="primary" />
+                            <Typography variant="body2" color="text.secondary">
+                              {sourceProtected} protected
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">Protection:</Typography>
+                          <Box sx={{ flex: 1, maxWidth: 200 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={sourceProtectionPercent}
+                              color={
+                                sourceProtectionPercent >= 75
+                                  ? "success"
+                                  : sourceProtectionPercent >= 50
+                                  ? "warning"
+                                  : "error"
+                              }
+                              sx={{ height: 6, borderRadius: 5 }}
+                            />
+                          </Box>
                           <Typography variant="body2" color="text.secondary">
-                            {protectedItems} protected
+                            {sourceProtectionPercent}%
                           </Typography>
                         </Box>
+
+                        {/* Search and Filter tabs */}
                         <Box
                           sx={{
                             display: "flex",
+                            justifyContent: "space-between",
                             alignItems: "center",
-                            ml: "auto",
+                            mb: 2,
                           }}
                         >
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mr: 1 }}
-                          >
-                            Protection:
-                          </Typography>
-                          <ProgressBar
-                            value={protectionPercentage}
-                            color={
-                              protectionPercentage > 70
-                                ? "success"
-                                : protectionPercentage > 30
-                                ? "warning"
-                                : "error"
+                          <TextField
+                            size="small"
+                            placeholder="Search data..."
+                            value={searchTerm}
+                            onChange={(e) =>
+                              handleSearchChange(source, e.target.value)
                             }
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <Search fontSize="small" />
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{ width: 300 }}
                           />
+                          
+                          <Tabs
+                            value={filterTab}
+                            onChange={(e, newValue) =>
+                              handleFilterTabChange(source, newValue)
+                            }
+                          >
+                            <Tab label="ALL" />
+                            <Tab label="PROTECTED" />
+                            <Tab label="UNPROTECTED" />
+                          </Tabs>
                         </Box>
-                      </Stack>
-                    </CardContent>
 
-                    <Divider />
-                    <Box sx={{ display: "flex", p: 2, alignItems: "center" }}>
-                      <TextField
-                        placeholder="Search data..."
-                        variant="outlined"
-                        size="small"
-                        value={searchTerm}
-                        onChange={(e) =>
-                          handleSearchChange(source, e.target.value)
-                        }
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <Search />
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ mr: 2 }}
-                      />
-                      <Tabs
-                        value={filterTab}
-                        onChange={(e, newValue) =>
-                          handleTabChange(source, newValue)
-                        }
-                        sx={{ ml: "auto" }}
-                        indicatorColor="primary"
-                        textColor="primary"
-                        size="small"
-                      >
-                        <Tab label="All" />
-                        <Tab label="Protected" />
-                        <Tab label="Unprotected" />
-                      </Tabs>
-                    </Box>
-                    <Divider />
+                        <TableContainer>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <StyledTableCell>Property</StyledTableCell>
+                                <StyledTableCell>Value</StyledTableCell>
+                                <StyledTableCell align="right">
+                                  Policy
+                                </StyledTableCell>
+                                <StyledTableCell align="center">
+                                  Status
+                                </StyledTableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {renderSourceDataAsTable(
+                                source,
+                                sourceData,
+                                searchTerm,
+                                filterTab
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
 
-                    <TableContainer
-                      component={Box}
-                      sx={{
-                        flexGrow: 1,
-                        overflowY: "auto",
-                        maxHeight: "600px",
-                      }}
-                    >
-                      <Table size="small" stickyHeader>
-                        <TableHead>
-                          <TableRow>
-                            <StyledTableCell width="200px">
-                              Property
-                            </StyledTableCell>
-                            <StyledTableCell>Value</StyledTableCell>
-                            <StyledTableCell align="right" width="120px">
-                              Policy
-                            </StyledTableCell>
-                            <StyledTableCell align="center" width="70px">
-                              Status
-                            </StyledTableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {renderSourceDataAsTable(
-                            source,
-                            sourceData,
-                            searchTerm,
-                            filterTab
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Card>
-                </Grid>
-              );
-            })}
-          </Grid>
-        )}
+          {/* Policy management dialog */}
+          <Dialog
+            open={policyDialogOpen}
+            onClose={() => {
+              handlePolicyDialogClose();
+              setSelectedDataForPolicy(null);
+            }}
+            maxWidth="lg"
+            fullWidth
+          >
+            <DialogTitle>Manage Data Policies</DialogTitle>
+            <DialogContent>
+              <PolicyGroupsManager
+                data={data}
+                userId={user?.id}
+                selectedDataForPolicy={selectedDataForPolicy}
+                initialSelectedData={
+                  selectedDataForPolicy?.type === "entity"
+                    ? {
+                        entities: {
+                          [selectedDataForPolicy.source]: [
+                            selectedDataForPolicy.entityId,
+                          ],
+                        },
+                      }
+                    : selectedDataForPolicy?.type === "property"
+                    ? {
+                        properties: {
+                          [selectedDataForPolicy.source]: [
+                            selectedDataForPolicy.property,
+                          ],
+                        },
+                      }
+                    : selectedDataForPolicy
+                    ? {
+                        properties: {
+                          [selectedDataForPolicy.source]: [
+                            selectedDataForPolicy.property,
+                          ],
+                        },
+                      }
+                    : undefined
+                }
+              />
+            </DialogContent>
+          </Dialog>
 
-        {/* Policy management dialog */}
-        <Dialog
-          open={policyDialogOpen}
-          onClose={() => {
-            handlePolicyDialogClose();
-            setSelectedDataForPolicy(null);
-          }}
-          maxWidth="lg"
-          fullWidth
-        >
-          <DialogTitle>Manage Data Policies</DialogTitle>
-          <DialogContent>
-            <PolicyGroupsManager
-              data={data}
-              userId={user?.id}
-              selectedDataForPolicy={selectedDataForPolicy}
-              initialSelectedData={
-                selectedDataForPolicy?.type === "entity"
-                  ? {
-                      entities: {
-                        [selectedDataForPolicy.source]: [
-                          selectedDataForPolicy.entityId,
-                        ],
-                      },
-                    }
-                  : selectedDataForPolicy?.type === "property"
-                  ? {
-                      properties: {
-                        [selectedDataForPolicy.source]: [
-                          selectedDataForPolicy.property,
-                        ],
-                      },
-                    }
-                  : selectedDataForPolicy
-                  ? {
-                      properties: {
-                        [selectedDataForPolicy.source]: [
-                          selectedDataForPolicy.property,
-                        ],
-                      },
-                    }
-                  : undefined
-              }
-            />
-          </DialogContent>
-        </Dialog>
+          {/* Policy details dialog */}
+          <PolicyDetailsDialog
+            open={policyDetailsOpen}
+            onClose={() => setPolicyDetailsOpen(false)}
+            details={selectedPolicyDetails}
+          />
+        </TabPanel>
 
-        {/* Policy details dialog */}
-        <PolicyDetailsDialog
-          open={policyDetailsOpen}
-          onClose={() => setPolicyDetailsOpen(false)}
-          details={selectedPolicyDetails}
-        />
+        {/* Tab 2: Access History */}
+        <TabPanel value={currentTab} index={1}>
+          <SubjectAccessHistory
+            subjectId={user?.id}
+            controllers={controllers}
+          />
+        </TabPanel>
       </Box>
     </Box>
   );
