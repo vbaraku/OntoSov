@@ -12,7 +12,8 @@ import {
   DialogContent,
   Tabs,
   Tab,
-  Container,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -100,182 +101,265 @@ const ControllerPage = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Controller Dashboard
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage your databases, request access to subject data, and view your
-          compliance history
-        </Typography>
-      </Box>
-
-      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Tabs
-          value={currentTab}
-          onChange={handleTabChange}
-          aria-label="controller tabs"
+    <Box
+      sx={{
+        width: "100%",
+        minHeight: "100vh",
+        backgroundImage:
+          "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      <Box sx={{ maxWidth: "1400px", margin: "0 auto", p: 3 }}>
+        {/* Header with Tabs */}
+        <Box 
+          sx={{ 
+            mb: 4,
+            mt: 2,
+          }}
         >
-          <Tab
-            icon={<DatabaseIcon />}
-            label="Database Management"
-            iconPosition="start"
-          />
-          <Tab
-            icon={<PolicyIcon />}
-            label="Policy Checker"
-            iconPosition="start"
-          />
-          <Tab
-            icon={<HistoryIcon />}
-            label="Access History"
-            iconPosition="start"
-          />
-        </Tabs>
-      </Box>
-
-      {/* Tab 1: Database Management */}
-      <TabPanel value={currentTab} index={0}>
-        <Box>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 3,
-            }}
-          >
-            <Typography variant="h5">Your Databases</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenNewDB(true)}
-            >
-              Add Database
-            </Button>
-          </Box>
-
-          <Grid container spacing={3}>
-            {databases.map((db) => (
-              <Grid item xs={12} sm={6} md={4} key={db.id}>
-                <Card>
-                  <CardContent>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        mb: 2,
-                      }}
-                    >
-                      <StorageIcon
-                        sx={{ fontSize: 40, color: "primary.main" }}
-                      />
-                      <Box>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditMapping(db)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteDatabase(db.id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                    <Typography variant="h6" gutterBottom>
-                      {db.databaseName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {db.dbType} • {db.host}:{db.port}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-
-            {databases.length === 0 && (
-              <Grid item xs={12}>
-                <Card sx={{ textAlign: "center", py: 4 }}>
-                  <CardContent>
-                    <StorageIcon
-                      sx={{ fontSize: 60, color: "text.secondary", mb: 2 }}
-                    />
-                    <Typography variant="h6" gutterBottom>
-                      No databases yet
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Add your first database to start managing your data
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => setOpenNewDB(true)}
-                    >
-                      Add Database
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
+            <Grid item>
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "12px",
+                  bgcolor: "primary.main",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                }}
+              >
+                <DatabaseIcon sx={{ fontSize: 36, color: "white" }} />
+              </Box>
+            </Grid>
+            <Grid item xs>
+              <Box>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 600,
+                    color: "#1a1a1a",
+                    letterSpacing: "-1px",
+                  }}
+                >
+                  Controller{" "}
+                  <Box component="span" sx={{ color: "primary.main" }}>
+                    Dashboard
+                  </Box>
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Manage your databases, request access to subject data, and view your compliance history
+                </Typography>
+              </Box>
+            </Grid>
           </Grid>
+
+          {/* Tabs */}
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs
+              value={currentTab}
+              onChange={handleTabChange}
+              aria-label="controller tabs"
+            >
+              <Tab
+                icon={<DatabaseIcon />}
+                label="Database Management"
+                iconPosition="start"
+              />
+              <Tab
+                icon={<PolicyIcon />}
+                label="Policy Checker"
+                iconPosition="start"
+              />
+              <Tab
+                icon={<HistoryIcon />}
+                label="Access History"
+                iconPosition="start"
+              />
+            </Tabs>
+          </Box>
         </Box>
-      </TabPanel>
 
-      {/* Tab 2: Policy Checker */}
-      <TabPanel value={currentTab} index={1}>
-        <PolicyChecker controllerId={user?.id} />
-      </TabPanel>
+        {/* Tab 1: Database Management */}
+        <TabPanel value={currentTab} index={0}>
+          <Box>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
+            >
+              <Typography variant="h5">Your Databases</Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenNewDB(true)}
+              >
+                Add Database
+              </Button>
+            </Box>
 
-      {/* Tab 3: Access History */}
-      <TabPanel value={currentTab} index={2}>
-        <AccessHistory controllerId={user?.id} />
-      </TabPanel>
+            <Grid container spacing={3}>
+              {databases.map((db) => (
+                <Grid item xs={12} sm={6} md={4} key={db.id}>
+                  <Card 
+                    sx={{ 
+                      height: "100%", 
+                      boxShadow: 2,
+                      transition: "all 0.2s ease-in-out",
+                      "&:hover": {
+                        boxShadow: 4,
+                        transform: "translateY(-2px)",
+                      },
+                    }}
+                  >
+                    <CardContent>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          mb: 2,
+                        }}
+                      >
+                        <StorageIcon
+                          sx={{ fontSize: 40, color: "primary.main" }}
+                        />
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<EditIcon fontSize="small" />}
+                            onClick={() => handleEditMapping(db)}
+                            sx={{ textTransform: "none" }}
+                          >
+                            Edit Mappings
+                          </Button>
+                          <Tooltip title="Delete database">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDeleteDatabase(db.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
+                      
+                      <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
+                        {db.databaseName}
+                      </Typography>
+                      
+                      <Box sx={{ mb: 2 }}>
+                        <Chip 
+                          label={db.databaseType?.toUpperCase() || db.dbType?.toUpperCase()} 
+                          size="small" 
+                          color="primary" 
+                          sx={{ fontWeight: 500 }}
+                        />
+                      </Box>
+                      
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Host:</strong> {db.host}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Port:</strong> {db.port}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>User:</strong> {db.username}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
 
-      {/* Dialog for adding new database */}
-      <Dialog
-        open={openNewDB}
-        onClose={() => setOpenNewDB(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Add New Database</DialogTitle>
-        <DialogContent>
-          <DatabaseMappingWizard
-            controllerId={user?.id}
-            onComplete={() => {
-              setOpenNewDB(false);
-              setRefreshKey((prev) => prev + 1);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+              {databases.length === 0 && (
+                <Grid item xs={12}>
+                  <Card sx={{ textAlign: "center", py: 4 }}>
+                    <CardContent>
+                      <StorageIcon
+                        sx={{ fontSize: 60, color: "text.secondary", mb: 2 }}
+                      />
+                      <Typography variant="h6" gutterBottom>
+                        No databases yet
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Add your first database to start managing your data
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenNewDB(true)}
+                      >
+                        Add Database
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+            </Grid>
+          </Box>
+        </TabPanel>
 
-      {/* Dialog for editing database mapping */}
-      <Dialog
-        open={openMapping}
-        onClose={() => setOpenMapping(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Edit Database Mapping</DialogTitle>
-        <DialogContent>
-          <DatabaseMappingWizard
-            controllerId={user?.id}
-            database={selectedDB}
-            onComplete={() => {
-              setOpenMapping(false);
-              setRefreshKey((prev) => prev + 1);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-    </Container>
+        {/* Tab 2: Policy Checker */}
+        <TabPanel value={currentTab} index={1}>
+          <PolicyChecker controllerId={user?.id} />
+        </TabPanel>
+
+        {/* Tab 3: Access History */}
+        <TabPanel value={currentTab} index={2}>
+          <AccessHistory controllerId={user?.id} />
+        </TabPanel>
+
+        {/* Dialog for adding new database */}
+        <Dialog
+          open={openNewDB}
+          onClose={() => setOpenNewDB(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Add New Database</DialogTitle>
+          <DialogContent>
+            <DatabaseMappingWizard
+              controllerId={user?.id}
+              onComplete={() => {
+                setOpenNewDB(false);
+                setRefreshKey((prev) => prev + 1);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog for editing database mapping */}
+        <Dialog
+          open={openMapping}
+          onClose={() => setOpenMapping(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Edit Database Mapping</DialogTitle>
+          <DialogContent>
+            <DatabaseMappingWizard
+              controllerId={user?.id}
+              database={selectedDB}
+              onComplete={() => {
+                setOpenMapping(false);
+                setRefreshKey((prev) => prev + 1);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </Box>
+    </Box>
   );
 };
 

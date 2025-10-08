@@ -57,7 +57,7 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
   }),
 }));
 
-export default function SignIn(props) {  
+export default function SignIn(props) {
   const [emailError, setEmailError] = React.useState(false);
   const [emailErrorMessage, setEmailErrorMessage] = React.useState("");
   const [passwordError, setPasswordError] = React.useState(false);
@@ -84,19 +84,18 @@ export default function SignIn(props) {
     const password = document.getElementById("password").value;
 
     try {
-      const user = await login(email, password);  // Using AuthContext login
+      // Pass rememberMe to the login function
+      const user = await login(email, password, rememberMe);
 
-      if (rememberMe) {
-        localStorage.setItem("user", JSON.stringify(user));
-      } else {
-        sessionStorage.setItem("user", JSON.stringify(user));
-      }
-
+      // Navigate based on role
       navigate(user.role === "SUBJECT" ? "/subject" : "/controller");
     } catch (error) {
       console.error("Error during login:", error);
+      // Show error to user
+      setEmailError(true);
+      setEmailErrorMessage("Invalid email or password");
     }
-};
+  };
 
   const validateInputs = () => {
     const email = document.getElementById("email");
