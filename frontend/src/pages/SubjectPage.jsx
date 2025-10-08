@@ -391,15 +391,27 @@ const SubjectPage = () => {
     };
   };
 
-  const renderSourceDataAsTable = (source, sourceData, searchTerm, filterTab) => {
+  const renderSourceDataAsTable = (
+    source,
+    sourceData,
+    searchTerm,
+    filterTab
+  ) => {
     const rows = [];
 
     // 1. Person data first (property-level privacy)
     if (sourceData.Person) {
       rows.push(
-        <StyledTableRow key="person-header" sx={{ backgroundColor: "primary.50" }}>
+        <StyledTableRow
+          key="person-header"
+          sx={{ backgroundColor: "primary.50" }}
+        >
           <StyledTableCell colSpan={4}>
-            <Typography variant="subtitle2" fontWeight="bold" color="primary.main">
+            <Typography
+              variant="subtitle2"
+              fontWeight="bold"
+              color="primary.main"
+            >
               Personal Information
             </Typography>
           </StyledTableCell>
@@ -478,9 +490,16 @@ const SubjectPage = () => {
 
     if (transactionalEntityTypes.length > 0) {
       rows.push(
-        <StyledTableRow key="transactional-header" sx={{ backgroundColor: "secondary.50" }}>
+        <StyledTableRow
+          key="transactional-header"
+          sx={{ backgroundColor: "secondary.50" }}
+        >
           <StyledTableCell colSpan={4}>
-            <Typography variant="subtitle2" fontWeight="bold" color="secondary.main">
+            <Typography
+              variant="subtitle2"
+              fontWeight="bold"
+              color="secondary.main"
+            >
               Transactional Data
             </Typography>
           </StyledTableCell>
@@ -719,14 +738,12 @@ const SubjectPage = () => {
               <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
                 {/* Left side - Title */}
                 <Box sx={{ minWidth: 200 }}>
-                  <Typography variant="h6">
-                    Protection Summary
-                  </Typography>
+                  <Typography variant="h6">Protection Summary</Typography>
                   <Typography variant="body2" color="text.secondary">
                     Overall data protection status
                   </Typography>
                 </Box>
-                
+
                 {/* Vertical divider */}
                 <Box
                   sx={{
@@ -736,16 +753,28 @@ const SubjectPage = () => {
                     borderRadius: 1,
                   }}
                 />
-                
+
                 {/* Right side - Progress indicator */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    flex: 1,
+                  }}
+                >
                   <Box
                     sx={{
                       width: 50,
                       height: 50,
                       borderRadius: "50%",
                       border: 3,
-                      borderColor: protectionPercentage >= 75 ? "success.main" : protectionPercentage >= 50 ? "warning.main" : "error.main",
+                      borderColor:
+                        protectionPercentage >= 75
+                          ? "success.main"
+                          : protectionPercentage >= 50
+                          ? "warning.main"
+                          : "error.main",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -780,7 +809,8 @@ const SubjectPage = () => {
           {/* Data Display */}
           {Object.keys(data).length === 0 && (
             <Alert severity="info">
-              No data available. Connect databases to see your personal information.
+              No data available. Connect databases to see your personal
+              information.
             </Alert>
           )}
 
@@ -793,53 +823,86 @@ const SubjectPage = () => {
                 // Calculate per-source stats
                 let sourceTotal = 0;
                 let sourceProtected = 0;
-                
-                Object.entries(sourceData).forEach(([entityType, entityData]) => {
-                  if (entityType === "Person") {
-                    const personProperties = Object.keys(entityData);
-                    sourceTotal += personProperties.length;
-                    sourceProtected += personProperties.filter((property) =>
-                      isPropertyProtected(source, property)
-                    ).length;
-                  } else if (Array.isArray(entityData)) {
-                    sourceTotal += entityData.length;
-                    sourceProtected += entityData.filter((entity) =>
-                      isEntityProtected(source, entityType, entity.entityId)
-                    ).length;
-                  }
-                });
 
-                const sourceProtectionPercent = sourceTotal > 0 
-                  ? Math.round((sourceProtected / sourceTotal) * 100) 
-                  : 0;
+                Object.entries(sourceData).forEach(
+                  ([entityType, entityData]) => {
+                    if (entityType === "Person") {
+                      const personProperties = Object.keys(entityData);
+                      sourceTotal += personProperties.length;
+                      sourceProtected += personProperties.filter((property) =>
+                        isPropertyProtected(source, property)
+                      ).length;
+                    } else if (Array.isArray(entityData)) {
+                      sourceTotal += entityData.length;
+                      sourceProtected += entityData.filter((entity) =>
+                        isEntityProtected(source, entityType, entity.entityId)
+                      ).length;
+                    }
+                  }
+                );
+
+                const sourceProtectionPercent =
+                  sourceTotal > 0
+                    ? Math.round((sourceProtected / sourceTotal) * 100)
+                    : 0;
 
                 return (
                   <Grid item xs={12} key={source}>
                     <Card sx={{ boxShadow: 2 }}>
                       <CardContent>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                            mb: 1,
+                          }}
+                        >
                           <BusinessIcon color="action" sx={{ fontSize: 28 }} />
                           <Typography variant="h6" fontWeight="600">
                             {formatSourceName(source)}
                           </Typography>
                         </Box>
-                        
+
                         {/* Inline stats */}
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                            mb: 2,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
                             <DataUsageIcon fontSize="small" color="action" />
                             <Typography variant="body2" color="text.secondary">
                               {sourceTotal} data items
                             </Typography>
                           </Box>
-                          <Typography variant="body2" color="text.secondary">|</Typography>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            |
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
                             <Lock fontSize="small" color="primary" />
                             <Typography variant="body2" color="text.secondary">
                               {sourceProtected} protected
                             </Typography>
                           </Box>
-                          <Typography variant="body2" color="text.secondary">Protection:</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Protection:
+                          </Typography>
                           <Box sx={{ flex: 1, maxWidth: 200 }}>
                             <LinearProgress
                               variant="determinate"
@@ -884,7 +947,7 @@ const SubjectPage = () => {
                             }}
                             sx={{ width: 300 }}
                           />
-                          
+
                           <Tabs
                             value={filterTab}
                             onChange={(e, newValue) =>

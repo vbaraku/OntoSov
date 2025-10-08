@@ -1,31 +1,45 @@
-import React, { useContext, useRef, useEffect } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { AuthContext } from "./AuthContext";
 
 const ProtectedRoute = () => {
   const { user, setUser } = useContext(AuthContext);
+  const [isChecking, setIsChecking] = useState(true);
 
-  
   useEffect(() => {
-    // Check localStorage/sessionStorage on mount
+    // Only check storage once on mount
     const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
+    
     if (storedUser && !user) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Failed to parse stored user:", error);
+        // Clear invalid data
+        localStorage.removeItem("user");
+        sessionStorage.removeItem("user");
+      }
     }
-  }, [setUser, user]);
+    
+    setIsChecking(false);
+  }, []); // Empty dependency array - only run once on mount
 
-  if (!user) {
-    // Check if user data is available in local/session storage
-    const storedUser = localStorage.getItem("user") || sessionStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      return <Outlet />;
-    } else {
-      return <Navigate to="/signin" replace />;
-    }
+  // Show loading state while checking authentication
+  if (isChecking) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        Loading...
+      </div>
+    );
   }
 
-  return <Outlet />;
+  // After checking, either show protected content or redirect
+  return user ? <Outlet /> : <Navigate to="/signin" replace />;
 };
 
 export default ProtectedRoute;

@@ -18,8 +18,14 @@ function App() {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <AuthProvider>
-        <Router>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <Routes>
+            <Route path="/" element={<Navigate to="/signin" replace />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
             <Route element={<ProtectedRoute />}>
@@ -30,6 +36,8 @@ function App() {
                 element={<DatabaseMappingWizard />}
               />
             </Route>
+            {/* Catch-all route for 404 */}
+            <Route path="*" element={<Navigate to="/signin" replace />} />
           </Routes>
         </Router>
       </AuthProvider>
