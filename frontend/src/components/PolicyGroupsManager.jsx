@@ -35,6 +35,8 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import LayersIcon from "@mui/icons-material/Layers";
+import PolicyIcon from "@mui/icons-material/Policy";
 
 const tooltips = {
   read: "Basic access to view the data (e.g., viewing your profile information)",
@@ -1029,11 +1031,11 @@ const PolicyGroupsManager = ({
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
         <Typography variant="h5">Policies</Typography>
-        <Box>
+        <Box sx={{ display: "flex", gap: 1.5 }}>
           <Button
             variant="outlined"
+            startIcon={<LayersIcon />}
             onClick={() => setTemplateDialogOpen(true)}
-            sx={{ mr: 1 }}
           >
             Use Template
           </Button>
@@ -1044,6 +1046,7 @@ const PolicyGroupsManager = ({
               setFormState(initialFormState);
               setCreateDialogOpen(true);
             }}
+            sx={{ boxShadow: 2 }}
           >
             Create Policy
           </Button>
@@ -1051,37 +1054,76 @@ const PolicyGroupsManager = ({
       </Box>
 
       {policyGroups.length === 0 && !loading ? (
-        <Alert severity="info">
-          No policies found. Create your first policy to manage data access.
-        </Alert>
+        <Card
+          sx={{
+            textAlign: "center",
+            py: 6,
+            bgcolor: "grey.50",
+            boxShadow: 1,
+          }}
+        >
+          <CardContent>
+            <PolicyIcon sx={{ fontSize: 64, color: "primary.light", mb: 2 }} />
+            <Typography variant="h6" gutterBottom fontWeight={600}>
+              No Policies Yet
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Create your first policy to start managing data access and privacy
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setFormState(initialFormState);
+                setCreateDialogOpen(true);
+              }}
+              size="large"
+            >
+              Create Your First Policy
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <List>
           {policyGroups.map((group) => (
-            <ListItem
+            <Card
               key={group.id}
               sx={{
                 mb: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
+                boxShadow: 2,
+                transition: "all 0.2s ease-in-out",
+                "&:hover": {
+                  boxShadow: 4,
+                  transform: "translateY(-2px)",
+                },
               }}
             >
-              <ListItemText
-                primary={group.name}
-                secondary={
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
+              <CardContent>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="h6" gutterBottom fontWeight={600}>
+                      {group.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      paragraph
+                    >
                       {group.description}
                     </Typography>
                     <Box
                       sx={{
-                        mt: 1,
                         display: "flex",
                         flexWrap: "wrap",
                         gap: 0.5,
                       }}
                     >
-                      {/* Display permissions as badges */}
                       {Object.entries(group.permissions)
                         .filter(([_, value]) => value)
                         .map(([key]) => (
@@ -1094,7 +1136,6 @@ const PolicyGroupsManager = ({
                           />
                         ))}
 
-                      {/* Display AI training restriction if present */}
                       {group.aiRestrictions?.allowAiTraining === false && (
                         <Chip
                           label="No AI Training"
@@ -1105,25 +1146,35 @@ const PolicyGroupsManager = ({
                       )}
                     </Box>
                   </Box>
-                }
-              />
-              <ListItemSecondaryAction>
-                <IconButton onClick={() => handleEditGroup(group)}>
-                  <EditIcon />
-                </IconButton>
-                <IconButton onClick={() => handleDeleteGroup(group.id)}>
-                  <DeleteIcon />
-                </IconButton>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => handleAssignGroup(group)}
-                  sx={{ ml: 1 }}
-                >
-                  Assign Data
-                </Button>
-              </ListItemSecondaryAction>
-            </ListItem>
+                  <Box sx={{ display: "flex", gap: 1, ml: 2 }}>
+                    <Tooltip title="Edit policy">
+                      <IconButton
+                        onClick={() => handleEditGroup(group)}
+                        size="small"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete policy">
+                      <IconButton
+                        onClick={() => handleDeleteGroup(group.id)}
+                        color="error"
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleAssignGroup(group)}
+                    >
+                      Assign Data
+                    </Button>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
           ))}
         </List>
       )}
