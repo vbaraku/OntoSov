@@ -3,6 +3,8 @@ import { AuthContext } from "../components/AuthContext";
 import PolicyGroupsManager from "../components/PolicyGroupsManager";
 import PolicyDetailsDialog from "../components/PolicyDetailsDialog";
 import SubjectAccessHistory from "../components/SubjectAccessHistory";
+import SkeletonSubjectLoading from "../components/SkeletonSubjectLoading";
+import DataExport from "../components/DataExport";
 import {
   Box,
   Typography,
@@ -610,18 +612,7 @@ const SubjectPage = () => {
   };
 
   if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return <SkeletonSubjectLoading />;
   }
 
   if (error) {
@@ -742,7 +733,7 @@ const SubjectPage = () => {
                   }}
                 />
 
-                {/* Right side - Progress indicator */}
+                {/* Middle - Progress indicator */}
                 <Box
                   sx={{
                     display: "flex",
@@ -789,6 +780,26 @@ const SubjectPage = () => {
                       sx={{ height: 6, borderRadius: 5 }}
                     />
                   </Box>
+                </Box>
+
+                {/* Vertical divider */}
+                <Box
+                  sx={{
+                    width: 2,
+                    height: 50,
+                    bgcolor: "grey.300",
+                    borderRadius: 1,
+                  }}
+                />
+
+                {/* Right side - Action buttons */}
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <DataExport
+                    data={data}
+                    user={user}
+                    policyStatus={policyStatus}
+                    policyGroups={policyGroups}
+                  />
                 </Box>
               </Box>
             </CardContent>
