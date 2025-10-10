@@ -41,8 +41,6 @@ import {
   DataUsage as DataUsageIcon,
   History as HistoryIcon,
   Business as BusinessIcon,
-  Person as PersonIcon,
-  Receipt as ReceiptIcon,
 } from "@mui/icons-material";
 import AddModeratorIcon from "@mui/icons-material/AddModerator";
 
@@ -66,30 +64,6 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
     backgroundColor: theme.palette.action.selected,
   },
 }));
-
-const ProgressBar = ({ value, color = "primary" }) => (
-  <Box
-    sx={{
-      position: "relative",
-      display: "inline-flex",
-      alignItems: "center",
-      width: 100,
-    }}
-  >
-    <LinearProgress
-      variant="determinate"
-      value={value}
-      color={color}
-      sx={{ width: "100%", height: 8, borderRadius: 5 }}
-    />
-    <Typography
-      variant="caption"
-      sx={{ position: "absolute", right: -35, color: "text.secondary" }}
-    >
-      {Math.round(value)}%
-    </Typography>
-  </Box>
-);
 
 // TabPanel component
 function TabPanel({ children, value, index, ...other }) {
@@ -176,7 +150,7 @@ const SubjectPage = () => {
         setPolicyGroups(data);
       }
     } catch (err) {
-      console.error("Error fetching policies:", err);
+      console.error("Error fetching policy groups:", err);
     }
   };
 
@@ -197,7 +171,14 @@ const SubjectPage = () => {
   const isPropertyProtected = (source, property) => {
     for (const groupId in policyStatus) {
       const sourceMap = policyStatus[groupId];
-      if (sourceMap && sourceMap[source] && sourceMap[source][property]) {
+      if (
+        sourceMap &&
+        sourceMap[source] &&
+        sourceMap[source][property] &&
+        Object.keys(sourceMap[source][property]).some(
+          (key) => !key.startsWith("__")
+        )
+      ) {
         return true;
       }
     }
@@ -207,21 +188,18 @@ const SubjectPage = () => {
   const isEntityProtected = (source, entityType, entityId) => {
     for (const groupId in policyStatus) {
       const sourceMap = policyStatus[groupId];
-      if (sourceMap && sourceMap[source] && sourceMap[source][entityId]) {
+      if (
+        sourceMap &&
+        sourceMap[source] &&
+        sourceMap[source][entityId] &&
+        Object.keys(sourceMap[source][entityId]).some(
+          (key) => !key.startsWith("__")
+        )
+      ) {
         return true;
       }
     }
     return false;
-  };
-
-  const handleApplyPolicyToEntity = (source, entityType, entityId) => {
-    setSelectedDataForPolicy({
-      source,
-      entityType,
-      entityId,
-      type: "entity",
-    });
-    setPolicyDialogOpen(true);
   };
 
   const getPolicyInfo = (source, property) => {
@@ -256,74 +234,6 @@ const SubjectPage = () => {
       }
     }
     return policies;
-  };
-
-  const handleShowPolicyDetails = (source, property) => {
-    const policies = getPolicyInfo(source, property);
-    if (policies.length > 0) {
-      setSelectedPolicyDetails({
-        source,
-        property,
-        policies,
-      });
-      setPolicyDetailsOpen(true);
-    }
-  };
-
-  const handlePolicyDialogClose = () => {
-    setPolicyDialogOpen(false);
-    fetchPolicyStatus();
-    fetchPolicyGroups();
-  };
-
-  const handleSearchChange = (source, term) => {
-    setSearchTerms((prev) => ({
-      ...prev,
-      [source]: term,
-    }));
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
-  };
-
-  const handleFilterTabChange = (source, tab) => {
-    setFilterTabs((prev) => ({
-      ...prev,
-      [source]: tab,
-    }));
-  };
-
-  const formatSourceName = (source) => {
-    const parts = source.split(" - ");
-    if (parts.length === 2) {
-      return (
-        <Box>
-          <Typography component="span" fontWeight="bold">
-            {parts[0]}
-          </Typography>
-          <Typography component="span" color="text.secondary">
-            {" · "}
-            {parts[1]}
-          </Typography>
-        </Box>
-      );
-    }
-    return source;
-  };
-
-  const handleShowEntityPolicyDetails = (source, entityType, entityId) => {
-    const policies = getEntityPolicyInfo(source, entityId);
-    if (policies.length > 0) {
-      setSelectedPolicyDetails({
-        source,
-        entityType,
-        entityId,
-        type: "entity",
-        policies,
-      });
-      setPolicyDetailsOpen(true);
-    }
   };
 
   const getEntityPolicyInfo = (source, entityId) => {
@@ -621,6 +531,84 @@ const SubjectPage = () => {
     return rows;
   };
 
+  const handleShowPolicyDetails = (source, property) => {
+    const policies = getPolicyInfo(source, property);
+    if (policies.length > 0) {
+      setSelectedPolicyDetails({
+        source,
+        property,
+        policies,
+      });
+      setPolicyDetailsOpen(true);
+    }
+  };
+
+  const handlePolicyDialogClose = () => {
+    setPolicyDialogOpen(false);
+    fetchPolicyStatus();
+    fetchPolicyGroups();
+  };
+
+  const handleSearchChange = (source, term) => {
+    setSearchTerms((prev) => ({
+      ...prev,
+      [source]: term,
+    }));
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  const handleFilterTabChange = (source, tab) => {
+    setFilterTabs((prev) => ({
+      ...prev,
+      [source]: tab,
+    }));
+  };
+
+  const formatSourceName = (source) => {
+    const parts = source.split(" - ");
+    if (parts.length === 2) {
+      return (
+        <Box>
+          <Typography component="span" fontWeight="bold">
+            {parts[0]}
+          </Typography>
+          <Typography component="span" color="text.secondary">
+            {" · "}
+            {parts[1]}
+          </Typography>
+        </Box>
+      );
+    }
+    return source;
+  };
+
+  const handleShowEntityPolicyDetails = (source, entityType, entityId) => {
+    const policies = getEntityPolicyInfo(source, entityId);
+    if (policies.length > 0) {
+      setSelectedPolicyDetails({
+        source,
+        entityType,
+        entityId,
+        type: "entity",
+        policies,
+      });
+      setPolicyDetailsOpen(true);
+    }
+  };
+
+  const handleApplyPolicyToEntity = (source, entityType, entityId) => {
+    setPolicyDialogOpen(true);
+    setSelectedDataForPolicy({
+      type: "entity",
+      source: source,
+      entityType: entityType,
+      entityId: entityId,
+    });
+  };
+
   if (loading) {
     return (
       <Box
@@ -660,7 +648,7 @@ const SubjectPage = () => {
     >
       <Box sx={{ maxWidth: "1200px", margin: "0 auto", p: 3 }}>
         <Box sx={{ mb: 4, mt: 2 }}>
-          <Grid container spacing={2} alignItems="center">
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
             <Grid item>
               <Box
                 sx={{
@@ -681,15 +669,16 @@ const SubjectPage = () => {
               <Box>
                 <Typography
                   variant="h4"
-                  fontWeight="bold"
                   sx={{
-                    background: "linear-gradient(90deg, #1565c0, #1565c0)",
-                    backgroundClip: "text",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
+                    fontWeight: 600,
+                    color: "#1a1a1a",
+                    letterSpacing: "-1px",
                   }}
                 >
-                  Personal Data Dashboard
+                  Personal Data{" "}
+                  <Box component="span" sx={{ color: "primary.main" }}>
+                    Dashboard
+                  </Box>
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
                   Manage privacy policies for your personal information
@@ -704,30 +693,29 @@ const SubjectPage = () => {
                 size="large"
                 sx={{ boxShadow: 2 }}
               >
-                Create Policy
+                Manage Policies
               </Button>
             </Grid>
           </Grid>
-        </Box>
 
-        {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-          <Tabs
-            value={currentTab}
-            onChange={handleTabChange}
-            aria-label="subject tabs"
-          >
-            <Tab
-              icon={<DataUsageIcon />}
-              label="My Data"
-              iconPosition="start"
-            />
-            <Tab
-              icon={<HistoryIcon />}
-              label="Access History"
-              iconPosition="start"
-            />
-          </Tabs>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs
+              value={currentTab}
+              onChange={handleTabChange}
+              aria-label="subject tabs"
+            >
+              <Tab
+                icon={<DataUsageIcon />}
+                label="My Data"
+                iconPosition="start"
+              />
+              <Tab
+                icon={<HistoryIcon />}
+                label="Access History"
+                iconPosition="start"
+              />
+            </Tabs>
+          </Box>
         </Box>
 
         {/* Tab 1: My Data */}
@@ -999,11 +987,11 @@ const SubjectPage = () => {
               handlePolicyDialogClose();
               setSelectedDataForPolicy(null);
             }}
-            maxWidth="lg"
+            maxWidth="md"
             fullWidth
           >
             <DialogTitle>Manage Data Policies</DialogTitle>
-            <DialogContent>
+            <DialogContent dividers>
               <PolicyGroupsManager
                 data={data}
                 userId={user?.id}
