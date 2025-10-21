@@ -13,4 +13,6 @@ public class AccessRequestDTO {
     private String action;              // "read", "use", "share", "aggregate", "modify"
     private String purpose;             // "Medical Treatment", "Research", "Marketing", etc.
     private String dataDescription;     // Brief description of what data
+    private String dataSource;          // database ID from getDatabasesForController
+    private String dataProperty;        // column name from getDatabaseTables
 }

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -23,6 +24,8 @@ public class AccessLog {
     private String action;
     private String purpose;
     private String dataDescription;
+    private String dataSource;
+    private String dataProperty;
 
     @Enumerated(EnumType.STRING)
     private DecisionResult decision;

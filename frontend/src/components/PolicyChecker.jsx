@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   TextField,
@@ -18,6 +18,9 @@ import {
   Grid,
   Card,
   CardContent,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import {
   Send as SendIcon,
@@ -34,13 +37,73 @@ const PolicyChecker = ({ controllerId }) => {
     subjectTaxId: "",
     action: "read",
     purpose: "",
+    dataSource: "",
+    dataProperty: "",
     dataDescription: "",
   });
+  const [databases, setDatabases] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [decision, setDecision] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // Fetch databases when component mounts
+  useEffect(() => {
+    if (controllerId) {
+      fetchDatabases();
+    }
+  }, [controllerId]);
+
+  const fetchDatabases = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/database/controller/${controllerId}/databases`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setDatabases(data);
+      }
+    } catch (err) {
+      console.error("Error fetching databases:", err);
+    }
+  };
+
+  const handleDatabaseChange = async (dbId) => {
+    setFormData({ ...formData, dataSource: dbId, dataProperty: "" });
+    setProperties([]);
+
+    if (!dbId) return;
+
+    try {
+      const selectedDb = databases.find((d) => d.id === dbId);
+      if (!selectedDb) return;
+
+      const response = await fetch(
+        "http://localhost:8080/api/database/tables",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(selectedDb),
+        }
+      );
+
+      if (response.ok) {
+        const tables = await response.json();
+
+        // Extract all column names from all tables
+        const allColumns = new Set();
+        tables.forEach((table) => {
+          table.columns.forEach((col) => allColumns.add(col.name));
+        });
+
+        setProperties(Array.from(allColumns).sort());
+      }
+    } catch (err) {
+      console.error("Error fetching properties:", err);
+    }
+  };
 
   const handleChange = (field) => (event) => {
     setFormData({
@@ -57,13 +120,16 @@ const PolicyChecker = ({ controllerId }) => {
     if (!formData.subjectTaxId.trim()) {
       errors.subjectTaxId = "Subject Tax ID is required";
     }
+    if (!formData.dataSource) {
+      errors.dataSource = "Data source is required";
+    }
+    if (!formData.dataProperty) {
+      errors.dataProperty = "Data property is required";
+    }
     if (!formData.purpose.trim()) {
       errors.purpose = "Purpose is required";
     } else if (formData.purpose.trim().length < 10) {
       errors.purpose = "Purpose must be at least 10 characters";
-    }
-    if (!formData.dataDescription.trim()) {
-      errors.dataDescription = "Data description is required";
     }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -109,8 +175,11 @@ const PolicyChecker = ({ controllerId }) => {
       subjectTaxId: "",
       action: "read",
       purpose: "",
+      dataSource: "",
+      dataProperty: "",
       dataDescription: "",
     });
+    setProperties([]);
     setValidationErrors({});
     setDecision(null);
   };
@@ -134,8 +203,8 @@ const PolicyChecker = ({ controllerId }) => {
 
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>How it works:</strong> Enter the subject's tax ID and
-          describe what data you need. The system will evaluate your request
+          <strong>How it works:</strong> Enter the subject's tax ID and select
+          the specific data you need. The system will evaluate your request
           against the subject's policies and provide an instant decision.
         </Typography>
       </Alert>
@@ -168,6 +237,92 @@ const PolicyChecker = ({ controllerId }) => {
                 required
                 disabled={loading}
               />
+
+              <FormControl
+                fullWidth
+                margin="normal"
+                required
+                error={!!validationErrors.dataSource}
+                disabled={loading}
+              >
+                <InputLabel>Data Source</InputLabel>
+                <Select
+                  value={formData.dataSource}
+                  onChange={(e) => handleDatabaseChange(e.target.value)}
+                  label="Data Source"
+                >
+                  <MenuItem value="">
+                    <em>Select a database</em>
+                  </MenuItem>
+                  {databases.map((db) => (
+                    <MenuItem key={db.id} value={db.id}>
+                      {db.databaseName} ({db.databaseType?.toUpperCase()})
+                    </MenuItem>
+                  ))}
+                </Select>
+                {validationErrors.dataSource && (
+                  <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    {validationErrors.dataSource}
+                  </Typography>
+                )}
+                {!validationErrors.dataSource && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    Select which database contains the data
+                  </Typography>
+                )}
+              </FormControl>
+
+              <FormControl
+                fullWidth
+                margin="normal"
+                required
+                error={!!validationErrors.dataProperty}
+                disabled={loading || !formData.dataSource}
+              >
+                <InputLabel>Data Property</InputLabel>
+                <Select
+                  value={formData.dataProperty}
+                  onChange={handleChange("dataProperty")}
+                  label="Data Property"
+                >
+                  <MenuItem value="">
+                    <em>Select a property</em>
+                  </MenuItem>
+                  {properties.map((prop) => (
+                    <MenuItem key={prop} value={prop}>
+                      {prop}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {validationErrors.dataProperty && (
+                  <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    {validationErrors.dataProperty}
+                  </Typography>
+                )}
+                {!validationErrors.dataProperty && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    {formData.dataSource
+                      ? "Select which property/column you need"
+                      : "Select a data source first"}
+                  </Typography>
+                )}
+              </FormControl>
 
               <TextField
                 fullWidth
@@ -207,16 +362,11 @@ const PolicyChecker = ({ controllerId }) => {
 
               <TextField
                 fullWidth
-                label="Data Description"
+                label="Data Description (Optional)"
                 value={formData.dataDescription}
                 onChange={handleChange("dataDescription")}
-                error={!!validationErrors.dataDescription}
-                helperText={
-                  validationErrors.dataDescription ||
-                  "Describe what data you need to access"
-                }
+                helperText="Additional context about this request (for logging)"
                 margin="normal"
-                required
                 multiline
                 rows={2}
                 disabled={loading}
@@ -235,7 +385,11 @@ const PolicyChecker = ({ controllerId }) => {
                 >
                   {loading ? "Checking..." : "Check Access"}
                 </Button>
-                <Button variant="outlined" onClick={handleReset} disabled={loading}>
+                <Button
+                  variant="outlined"
+                  onClick={handleReset}
+                  disabled={loading}
+                >
                   Reset
                 </Button>
               </Box>
@@ -259,7 +413,9 @@ const PolicyChecker = ({ controllerId }) => {
                     sx={{ fontSize: 48, color: "success.main", mr: 2 }}
                   />
                 ) : (
-                  <CancelIcon sx={{ fontSize: 48, color: "error.main", mr: 2 }} />
+                  <CancelIcon
+                    sx={{ fontSize: 48, color: "error.main", mr: 2 }}
+                  />
                 )}
                 <Box>
                   <Typography variant="h5" component="div">
@@ -274,17 +430,28 @@ const PolicyChecker = ({ controllerId }) => {
               <Divider sx={{ my: 2 }} />
 
               <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  gutterBottom
+                >
                   Reason
                 </Typography>
-                <Alert severity={isPermit ? "success" : "error"} icon={<InfoIcon />}>
+                <Alert
+                  severity={isPermit ? "success" : "error"}
+                  icon={<InfoIcon />}
+                >
                   {decision.reason}
                 </Alert>
               </Box>
 
               {decision.policyGroupId && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    gutterBottom
+                  >
                     Policy Evaluated
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -306,123 +473,55 @@ const PolicyChecker = ({ controllerId }) => {
 
               {decision.obligations && decision.obligations.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Required Actions
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    gutterBottom
+                  >
+                    Obligations
                   </Typography>
-                  <Alert severity="warning" sx={{ mt: 1 }}>
-                    <Typography variant="body2" gutterBottom>
-                      You must fulfill these obligations:
-                    </Typography>
-                    <List dense>
-                      {decision.obligations.map((obligation, index) => (
-                        <ListItem key={index} sx={{ py: 0 }}>
-                          <ListItemText
-                            primary={
-                              obligation.type.charAt(0).toUpperCase() +
-                              obligation.type.slice(1)
-                            }
-                            secondary={obligation.detail}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Alert>
+                  <List dense>
+                    {decision.obligations.map((obligation, index) => (
+                      <ListItem key={index}>
+                        <ListItemText
+                          primary={obligation.type}
+                          secondary={JSON.stringify(obligation.details)}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
                 </Box>
               )}
 
-              {decision.blockchainTxHash && (
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Blockchain Verification
-                  </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: "grey.50" }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "monospace",
-                          wordBreak: "break-all",
-                          flex: 1,
-                        }}
-                      >
-                        {decision.blockchainTxHash}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => copyToClipboard(decision.blockchainTxHash)}
-                      >
-                        <CopyIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ mt: 1, display: "block" }}
-                    >
-                      This decision has been recorded on the blockchain.
-                    </Typography>
-                  </Paper>
-                </Box>
-              )}
-
-              {isPermit && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  <Typography variant="body2">
-                    Access granted. Ensure you fulfill all obligations listed above.
-                  </Typography>
-                </Alert>
-              )}
-
-              {!isPermit && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  <Typography variant="body2">
-                    Access denied. Review the reason and adjust your request.
-                  </Typography>
-                </Alert>
-              )}
+              <Box sx={{ display: "flex", gap: 1, mt: 3 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<CopyIcon />}
+                  onClick={() =>
+                    copyToClipboard(JSON.stringify(decision, null, 2))
+                  }
+                >
+                  Copy Response
+                </Button>
+              </Box>
             </Paper>
           ) : (
-            <Card sx={{ bgcolor: "grey.50", height: "100%" }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Need Help?
+            <Card
+              sx={{
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CardContent sx={{ textAlign: "center" }}>
+                <InfoIcon
+                  sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
+                />
+                <Typography variant="h6" color="text.secondary">
+                  Submit a request to see the decision
                 </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>Purpose examples:</strong>
-                </Typography>
-                <ul>
-                  <li>
-                    <Typography variant="body2">
-                      Service Provision - fulfilling an order
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body2">
-                      Research - academic or market research
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body2">
-                      Marketing - promotional communications
-                    </Typography>
-                  </li>
-                </ul>
-                <Typography variant="body2" paragraph sx={{ mt: 2 }}>
-                  <strong>Data description examples:</strong>
-                </Typography>
-                <ul>
-                  <li>
-                    <Typography variant="body2">
-                      email from ecommerce database
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body2">purchase history</Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body2">contact information</Typography>
-                  </li>
-                </ul>
               </CardContent>
             </Card>
           )}
@@ -431,7 +530,7 @@ const PolicyChecker = ({ controllerId }) => {
 
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={2000}
+        autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
         message="Copied to clipboard"
       />
