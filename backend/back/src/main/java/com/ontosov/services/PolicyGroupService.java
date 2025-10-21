@@ -608,6 +608,10 @@ public class PolicyGroupService {
 
             // Generate ODRL policies within the same transaction
             odrlService.generatePoliciesFromAssignment(groupId, policyGroup, assignmentDTO, subjectId);
+            System.out.println("=== ASSIGNING POLICY ===");
+            System.out.println("Policy Group ID: " + groupId);
+            System.out.println("Subject ID: " + subjectId);
+            System.out.println("PropertyAssignments: " + assignmentDTO.getPropertyAssignments());
 
             dataset.commit();
         } catch (Exception e) {

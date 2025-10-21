@@ -44,9 +44,7 @@ public class DatabaseConfigService {
 
         // Check if this database already exists based on JDBC URL and name
         String existingId = findExistingDatabaseId(properties, configDTO);
-        String dbId = existingId != null ? existingId :
-                (configDTO.getId() != null ? configDTO.getId() :
-                        UUID.randomUUID().toString());
+        String dbId = existingId != null ? existingId : (configDTO.getId() != null ? configDTO.getId() : UUID.randomUUID().toString());
 
         // Remove any existing properties for this database
         removeExistingDatabase(properties, dbId);
@@ -80,16 +78,14 @@ public class DatabaseConfigService {
             if (parts.length >= 3) {
                 String dbId = parts[1];
                 String propertyName = String.join(".", Arrays.copyOfRange(parts, 2, parts.length));
-                databaseConfigs.computeIfAbsent(dbId, k -> new HashMap<>())
-                        .put(propertyName, properties.getProperty(key));
+                databaseConfigs.computeIfAbsent(dbId, k -> new HashMap<>()).put(propertyName, properties.getProperty(key));
             }
         }
 
         // Look for matching database
         for (Map.Entry<String, Map<String, String>> entry : databaseConfigs.entrySet()) {
             Map<String, String> config = entry.getValue();
-            if (config.get("jdbc.url").equals(newConfig.getJdbcUrl()) &&
-                    config.get("name").equals(newConfig.getDatabaseName())) {
+            if (config.get("jdbc.url").equals(newConfig.getJdbcUrl()) && config.get("name").equals(newConfig.getDatabaseName())) {
                 return entry.getKey();
             }
         }
@@ -99,9 +95,7 @@ public class DatabaseConfigService {
 
     private void removeExistingDatabase(Properties properties, String dbId) {
         String prefix = "db." + dbId + ".";
-        properties.stringPropertyNames().stream()
-                .filter(key -> key.startsWith(prefix))
-                .collect(Collectors.toList()) // Collect to avoid concurrent modification
+        properties.stringPropertyNames().stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toList()) // Collect to avoid concurrent modification
                 .forEach(properties::remove);
     }
 
@@ -120,11 +114,7 @@ public class DatabaseConfigService {
         StringBuilder obdaContent = new StringBuilder();
 
         // Add prefix declarations
-        obdaContent.append("[PrefixDeclaration]\n")
-                .append(":       http://example.org/resource#\n")
-                .append("schema: http://schema.org/\n")
-                .append("xsd:    http://www.w3.org/2001/XMLSchema#\n\n")
-                .append("[MappingDeclaration] @collection [[\n");
+        obdaContent.append("[PrefixDeclaration]\n").append(":       http://example.org/resource#\n").append("schema: http://schema.org/\n").append("xsd:    http://www.w3.org/2001/XMLSchema#\n\n").append("[MappingDeclaration] @collection [[\n");
 
         // Group mappings by main entity and identify relationships
         Map<String, List<SchemaMappingDTO>> propertyMappings = new HashMap<>();
@@ -134,8 +124,7 @@ public class DatabaseConfigService {
             if (mapping.getTargetTable() != null) {
                 relationshipMappings.add(mapping);
             } else {
-                propertyMappings.computeIfAbsent(mapping.getDatabaseTable(), k -> new ArrayList<>())
-                        .add(mapping);
+                propertyMappings.computeIfAbsent(mapping.getDatabaseTable(), k -> new ArrayList<>()).add(mapping);
             }
         }
 
@@ -162,11 +151,7 @@ public class DatabaseConfigService {
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
     }
 
-    private void generateEntityMapping(StringBuilder obdaContent,
-                                       String tableName,
-                                       String primaryKey,
-                                       String schemaClass,
-                                       List<SchemaMappingDTO> mappings) {
+    private void generateEntityMapping(StringBuilder obdaContent, String tableName, String primaryKey, String schemaClass, List<SchemaMappingDTO> mappings) {
         StringBuilder target = new StringBuilder();
         target.append(String.format(":%s/{%s} a schema:%s", schemaClass, primaryKey, schemaClass));
 
@@ -174,24 +159,15 @@ public class DatabaseConfigService {
         source.append("SELECT ").append(primaryKey);
 
         for (SchemaMappingDTO mapping : mappings) {
-            target.append(String.format(" ; schema:%s {%s}",
-                    mapping.getSchemaProperty(),
-                    mapping.getDatabaseColumn()));
+            target.append(String.format(" ; schema:%s {%s}", mapping.getSchemaProperty(), mapping.getDatabaseColumn()));
             source.append(", ").append(mapping.getDatabaseColumn());
         }
         target.append(" .\n");
 
-        obdaContent.append(String.format("mappingId %s_mapping\n", tableName))
-                .append("target  ").append(target)
-                .append("source  ").append(source)
-                .append(" FROM ").append(tableName)
-                .append("\n\n");
+        obdaContent.append(String.format("mappingId %s_mapping\n", tableName)).append("target  ").append(target).append("source  ").append(source).append(" FROM ").append(tableName).append("\n\n");
     }
 
-    private void generateRelationshipMapping(StringBuilder obdaContent,
-                                             SchemaMappingDTO mapping,
-                                             DatabaseConfigDTO config,
-                                             Map<String, List<SchemaMappingDTO>> propertyMappings) {
+    private void generateRelationshipMapping(StringBuilder obdaContent, SchemaMappingDTO mapping, DatabaseConfigDTO config, Map<String, List<SchemaMappingDTO>> propertyMappings) {
         String sourceTable = mapping.getDatabaseTable();
         String targetTable = mapping.getTargetTable();
         String sourcePrimaryKey = getPrimaryKeyColumn(config, sourceTable);
@@ -203,20 +179,7 @@ public class DatabaseConfigService {
 
         String mappingId = String.format("%s_%s_rel", sourceTable, targetTable);
 
-        obdaContent.append(String.format("mappingId %s\n", mappingId))
-                .append(String.format("target  :%s/{%s} schema:%s :%s/{%s} .\n",
-                        sourceSchemaClass, sourcePrimaryKey,
-                        mapping.getSchemaProperty(),
-                        targetSchemaClass, targetPrimaryKey))
-                .append("source  ")
-                .append(String.format("SELECT s.%s, t.%s FROM %s s JOIN %s t ON s.%s = t.%s",
-                        sourcePrimaryKey,
-                        targetPrimaryKey,
-                        sourceTable,
-                        targetTable,
-                        mapping.getDatabaseColumn(),
-                        mapping.getTargetKey()))
-                .append("\n\n");
+        obdaContent.append(String.format("mappingId %s\n", mappingId)).append(String.format("target  :%s/{%s} schema:%s :%s/{%s} .\n", sourceSchemaClass, sourcePrimaryKey, mapping.getSchemaProperty(), targetSchemaClass, targetPrimaryKey)).append("source  ").append(String.format("SELECT s.%s, t.%s FROM %s s JOIN %s t ON s.%s = t.%s", sourcePrimaryKey, targetPrimaryKey, sourceTable, targetTable, mapping.getDatabaseColumn(), mapping.getTargetKey())).append("\n\n");
     }
 
     private String getSchemaClassForTable(String tableName, Map<String, List<SchemaMappingDTO>> propertyMappings) {
@@ -228,10 +191,7 @@ public class DatabaseConfigService {
     }
 
     private boolean hasUserIdColumn(DatabaseConfigDTO config, String tableName) {
-        try (Connection conn = DriverManager.getConnection(
-                config.getJdbcUrl(),
-                config.getUsername(),
-                config.getPassword())) {
+        try (Connection conn = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword())) {
             DatabaseMetaData metaData = conn.getMetaData();
             ResultSet columns = metaData.getColumns(null, null, tableName, "user_id");
             return columns.next();
@@ -384,32 +344,18 @@ public class DatabaseConfigService {
     public List<TableMetadataDTO> getDatabaseTables(DatabaseConfigDTO config) {
         List<TableMetadataDTO> tables = new ArrayList<>();
 
-        try (Connection connection = DriverManager.getConnection(
-                config.getJdbcUrl(),
-                config.getUsername(),
-                config.getPassword()
-        )) {
+        try (Connection connection = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword())) {
             DatabaseMetaData metaData = connection.getMetaData();
 
             // Fetch tables
-            ResultSet rs = metaData.getTables(
-                    connection.getCatalog(),
-                    null,
-                    "%",
-                    new String[]{"TABLE"}
-            );
+            ResultSet rs = metaData.getTables(connection.getCatalog(), null, "%", new String[]{"TABLE"});
 
             while (rs.next()) {
                 String tableName = rs.getString("TABLE_NAME");
                 TableMetadataDTO tableMetadata = new TableMetadataDTO(tableName);
 
                 // Fetch columns for each table
-                ResultSet columns = metaData.getColumns(
-                        connection.getCatalog(),
-                        null,
-                        tableName,
-                        "%"
-                );
+                ResultSet columns = metaData.getColumns(connection.getCatalog(), null, tableName, "%");
 
                 while (columns.next()) {
                     String columnName = columns.getString("COLUMN_NAME");
@@ -427,10 +373,7 @@ public class DatabaseConfigService {
     }
 
     private String getPrimaryKeyColumn(DatabaseConfigDTO config, String tableName) {
-        try (Connection conn = DriverManager.getConnection(
-                config.getJdbcUrl(),
-                config.getUsername(),
-                config.getPassword())) {
+        try (Connection conn = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword())) {
             DatabaseMetaData metaData = conn.getMetaData();
             ResultSet rs = metaData.getPrimaryKeys(null, null, tableName);
             if (rs.next()) {
@@ -447,11 +390,7 @@ public class DatabaseConfigService {
             System.out.println("Testing connection with URL: " + config.getJdbcUrl());
             System.out.println("Username: " + config.getUsername());
             Class.forName(getJdbcDriver(config.getDatabaseType())); // Add this line to ensure driver is loaded
-            Connection connection = DriverManager.getConnection(
-                    config.getJdbcUrl(),
-                    config.getUsername(),
-                    config.getPassword()
-            );
+            Connection connection = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword());
             connection.close();
             return true;
         } catch (Exception e) {
@@ -459,6 +398,38 @@ public class DatabaseConfigService {
             e.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * Resolve database column to Schema.org property name
+     */
+    public String resolveSchemaOrgProperty(Long controllerId, String databaseId, String databaseColumn) throws IOException {
+        // First, get the database name from the ID
+        List<DatabaseConfigDTO> databases = getDatabasesForController(controllerId);
+        String databaseName = null;
+
+        for (DatabaseConfigDTO db : databases) {
+            if (db.getId().equals(databaseId)) {
+                databaseName = db.getDatabaseName();
+                break;
+            }
+        }
+
+        if (databaseName == null) {
+            System.err.println("Database not found for ID: " + databaseId);
+            return null;
+        }
+
+        // Now get the mappings using the database name
+        List<SchemaMappingDTO> mappings = getMappings(controllerId, databaseName);
+        // Find the mapping for this column
+        for (SchemaMappingDTO mapping : mappings) {
+            if (mapping.getDatabaseColumn() != null && mapping.getDatabaseColumn().equals(databaseColumn)) {
+                return mapping.getSchemaProperty();
+            }
+        }
+        System.err.println("No mapping found for column: " + databaseColumn);
+        return null;
     }
 
     public void deleteDatabaseConfig(String dbId, Long controllerId) throws IOException {
@@ -474,9 +445,7 @@ public class DatabaseConfigService {
 
         // Remove all properties for this database
         String prefix = "db." + dbId;
-        List<String> keysToRemove = properties.stringPropertyNames().stream()
-                .filter(key -> key.startsWith(prefix))
-                .collect(Collectors.toList());
+        List<String> keysToRemove = properties.stringPropertyNames().stream().filter(key -> key.startsWith(prefix)).collect(Collectors.toList());
 
         keysToRemove.forEach(properties::remove);
 
