@@ -25,7 +25,7 @@ public class DataSourceConfig {
     @Primary
     public DataSource userDataSource() {
         return DataSourceBuilder.create()
-                .url("jdbc:postgresql://localhost:5432/ontoSov")
+                .url("jdbc:postgresql://localhost:5432/ontosov_system")
                 .username("postgres")
                 .password("postgres")
                 .driverClassName("org.postgresql.Driver")
@@ -62,7 +62,7 @@ public class DataSourceConfig {
     @Bean
     public DataSource controller1DataSource() {
         return DataSourceBuilder.create()
-                .url("jdbc:postgresql://localhost:5432/AControllerDB")
+                .url("jdbc:postgresql://localhost:5432/ecommerce_db")
                 .username("postgres")
                 .password("postgres")
                 .driverClassName("org.postgresql.Driver")

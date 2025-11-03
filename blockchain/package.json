@@ -24,5 +24,10 @@
     "mocha": "^11.7.4",
     "typescript": "~5.8.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@nomicfoundation/edr-win32-x64-msvc": "^0.12.0-next.10",
+    "install": "^0.13.0",
+    "npm": "^11.6.2"
+  }
 }

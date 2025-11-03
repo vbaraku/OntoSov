@@ -9,16 +9,16 @@ target  :Order/{order_id} a schema:Order ; schema:orderDate {order_date} .
 source  SELECT order_id, order_date FROM order_history
 
 mappingId user_profiles_mapping
-target  :Person/{user_id} a schema:Person ; schema:givenName {name} ; schema:taxID {tax_id} ; schema:email {email} ; schema:telephone {phone_number} .
-source  SELECT user_id, name, tax_id, email, phone_number FROM user_profiles
+target  :Person/{user_id} a schema:Person ; schema:taxID {tax_id} ; schema:givenName {name} ; schema:email {email} ; schema:telephone {phone_number} ; schema:address {address} .
+source  SELECT user_id, tax_id, name, email, phone_number, address FROM user_profiles
 
 mappingId store_locations_mapping
-target  :Store/{store_id} a schema:Store ; schema:name {store_name} ; schema:address {city} .
-source  SELECT store_id, store_name, city FROM store_locations
+target  :ElectronicsStore/{store_id} a schema:ElectronicsStore ; schema:location {city} .
+source  SELECT store_id, city FROM store_locations
 
 mappingId products_mapping
-target  :Product/{product_id} a schema:Product ; schema:category {category} ; schema:model {name} .
-source  SELECT product_id, category, name FROM products
+target  :Product/{product_id} a schema:Product ; schema:name {name} ; schema:category {category} ; schema:price {price} .
+source  SELECT product_id, name, category, price FROM products
 
 mappingId order_history_user_profiles_rel
 target  :Order/{order_id} schema:customer :Person/{user_id} .

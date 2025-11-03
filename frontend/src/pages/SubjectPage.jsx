@@ -324,7 +324,7 @@ const SubjectPage = () => {
               fontWeight="bold"
               color="primary.main"
             >
-              Personal Information
+              Personal Profile Data
             </Typography>
           </StyledTableCell>
         </StyledTableRow>
@@ -412,7 +412,7 @@ const SubjectPage = () => {
               fontWeight="bold"
               color="secondary.main"
             >
-              Transactional Data
+              Personal Transactional Data
             </Typography>
           </StyledTableCell>
         </StyledTableRow>
