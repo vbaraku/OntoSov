@@ -141,7 +141,7 @@ const AccessHistory = ({ controllerId }) => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" color="text.primary" gutterBottom>
         Access History
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>

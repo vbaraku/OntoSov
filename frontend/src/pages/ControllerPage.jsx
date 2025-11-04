@@ -113,8 +113,8 @@ const ControllerPage = () => {
     >
       <Box sx={{ maxWidth: "1400px", margin: "0 auto", p: 3 }}>
         {/* Header with Tabs */}
-        <Box 
-          sx={{ 
+        <Box
+          sx={{
             mb: 4,
             mt: 2,
           }}
@@ -195,7 +195,7 @@ const ControllerPage = () => {
                 mb: 3,
               }}
             >
-              <Typography variant="h5">Your Databases</Typography>
+              <Typography variant="h5" color="text.primary">Your Databases</Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
@@ -208,9 +208,9 @@ const ControllerPage = () => {
             <Grid container spacing={3}>
               {databases.map((db) => (
                 <Grid item xs={12} sm={6} md={4} key={db.id}>
-                  <Card 
-                    sx={{ 
-                      height: "100%", 
+                  <Card
+                    sx={{
+                      height: "100%",
                       boxShadow: 2,
                       transition: "all 0.2s ease-in-out",
                       "&:hover": {
@@ -252,20 +252,20 @@ const ControllerPage = () => {
                           </Tooltip>
                         </Box>
                       </Box>
-                      
+
                       <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
                         {db.databaseName}
                       </Typography>
-                      
+
                       <Box sx={{ mb: 2 }}>
-                        <Chip 
-                          label={db.databaseType?.toUpperCase() || db.dbType?.toUpperCase()} 
-                          size="small" 
-                          color="primary" 
+                        <Chip
+                          label={db.databaseType?.toUpperCase() || db.dbType?.toUpperCase()}
+                          size="small"
+                          color="primary"
                           sx={{ fontWeight: 500 }}
                         />
                       </Box>
-                      
+
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Host:</strong> {db.host}

@@ -400,36 +400,55 @@ public class DatabaseConfigService {
         }
     }
 
-    /**
-     * Resolve database column to Schema.org property name
-     */
-    public String resolveSchemaOrgProperty(Long controllerId, String databaseId, String databaseColumn) throws IOException {
-        // First, get the database name from the ID
-        List<DatabaseConfigDTO> databases = getDatabasesForController(controllerId);
-        String databaseName = null;
+    public String resolveSchemaOrgProperty(
+            Long controllerId,
+            String databaseId,
+            String tableName,
+            String columnName
+    ) throws IOException {
+        String obdaPath = getObdaPath(controllerId, getDatabaseNameFromId(controllerId, databaseId));
 
-        for (DatabaseConfigDTO db : databases) {
-            if (db.getId().equals(databaseId)) {
-                databaseName = db.getDatabaseName();
-                break;
-            }
-        }
-
-        if (databaseName == null) {
-            System.err.println("Database not found for ID: " + databaseId);
+        if (!Files.exists(Paths.get(obdaPath))) {
             return null;
         }
 
-        // Now get the mappings using the database name
-        List<SchemaMappingDTO> mappings = getMappings(controllerId, databaseName);
-        // Find the mapping for this column
-        for (SchemaMappingDTO mapping : mappings) {
-            if (mapping.getDatabaseColumn() != null && mapping.getDatabaseColumn().equals(databaseColumn)) {
-                return mapping.getSchemaProperty();
+        List<String> lines = Files.readAllLines(Paths.get(obdaPath));
+
+        // Look for the mapping for this specific table and column
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+
+            // Check if this is a mappingId line for our table
+            if (line.startsWith("mappingId") && line.contains(tableName)) {
+                // Look at the target line (next line after mappingId)
+                if (i + 1 < lines.size()) {
+                    String targetLine = lines.get(i + 1).trim();
+
+                    // Check if this mapping includes our column
+                    if (targetLine.contains("{" + columnName + "}")) {
+                        // Extract the Schema.org property
+                        // Pattern: schema:propertyName {columnName}
+                        Pattern pattern = Pattern.compile("schema:(\\w+)\\s+\\{" + columnName + "\\}");
+                        Matcher matcher = pattern.matcher(targetLine);
+                        if (matcher.find()) {
+                            return matcher.group(1);
+                        }
+                    }
+                }
             }
         }
-        System.err.println("No mapping found for column: " + databaseColumn);
+
         return null;
+    }
+
+    // Helper method to get database name from UUID
+    private String getDatabaseNameFromId(Long controllerId, String databaseId) throws IOException {
+        List<DatabaseConfigDTO> databases = getDatabasesForController(controllerId);
+        return databases.stream()
+                .filter(db -> db.getId().equals(databaseId))
+                .findFirst()
+                .map(DatabaseConfigDTO::getDatabaseName)
+                .orElse(null);
     }
 
     public void deleteDatabaseConfig(String dbId, Long controllerId) throws IOException {
