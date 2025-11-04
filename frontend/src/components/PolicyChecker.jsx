@@ -335,11 +335,11 @@ const PolicyChecker = ({ controllerId }) => {
                 error={!!validationErrors.dataSource}
                 disabled={loading}
               >
-                <InputLabel>Data Source (Database)</InputLabel>
+                <InputLabel>Data Source</InputLabel>
                 <Select
                   value={formData.dataSource}
                   onChange={(e) => handleDatabaseChange(e.target.value)}
-                  label="Data Source (Database)"
+                  label="Data Source"
                 >
                   <MenuItem value="">
                     <em>Select a database</em>

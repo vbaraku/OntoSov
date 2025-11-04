@@ -135,6 +135,14 @@ public class ODRLService {
                                         policyGroup.getAiRestrictions());
                             }
                         }
+
+                        // Explicitly create aiTraining policy if AI restrictions exist
+                        if (policyGroup.getAiRestrictions() != null && !policyGroup.getAiRestrictions().isEmpty()) {
+                            createPropertyPolicy(policyGroupId, subjectId, dataSource, property, "aiTraining",
+                                    policyGroup.getConstraints(),
+                                    policyGroup.getConsequences(),
+                                    policyGroup.getAiRestrictions());
+                        }
                     }
                 }
             }
@@ -156,6 +164,14 @@ public class ODRLService {
                                         policyGroup.getConsequences(),
                                         policyGroup.getAiRestrictions());
                             }
+                        }
+
+                        // Explicitly create aiTraining policy if AI restrictions exist
+                        if (policyGroup.getAiRestrictions() != null && !policyGroup.getAiRestrictions().isEmpty()) {
+                            createEntityPolicy(policyGroupId, subjectId, dataSource, entityType, entityId, "aiTraining",
+                                    policyGroup.getConstraints(),
+                                    policyGroup.getConsequences(),
+                                    policyGroup.getAiRestrictions());
                         }
                     }
                 }

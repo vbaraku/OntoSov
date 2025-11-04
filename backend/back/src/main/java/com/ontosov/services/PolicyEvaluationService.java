@@ -89,7 +89,15 @@ public class PolicyEvaluationService {
             );
 
             if (schemaOrgProperty == null) {
-                return createDenyDecision("No Schema.org mapping found for column: " + request.getDataProperty());
+                // No Schema.org mapping means this column is not governed by subject policies
+                // Default to PERMIT - subjects can only restrict mapped data
+                PolicyDecisionDTO decision = new PolicyDecisionDTO();
+                decision.setResult(DecisionResult.PERMIT);
+                decision.setReason("No Schema.org mapping found for column '" + request.getDataProperty() +
+                        "' in table '" + request.getTableName() +
+                        "'. Unmapped data is not governed by subject policies - access permitted by default.");
+                decision.setObligations(new ArrayList<>());
+                return decision;
             }
 
             System.out.println("Resolved identifiers:");
@@ -127,12 +135,13 @@ public class PolicyEvaluationService {
                 request.getAction()
         );
 
-        System.out.println("Checking policy access with:");
+        System.out.println("=== PERMISSION CHECK ===");
         System.out.println("  subjectId: " + subject.getId());
         System.out.println("  controllerId: " + request.getControllerId());
-        System.out.println("  dataSource: " + request.getDataSource());
+        System.out.println("  dataSource: " + dataSourceIdentifier);
         System.out.println("  schemaProperty: " + schemaOrgProperty);
         System.out.println("  action: " + request.getAction());
+        System.out.println("  hasAccessPermission: " + hasAccessPermission);
 
         if (!hasAccessPermission) {
             return createDenyDecision(
