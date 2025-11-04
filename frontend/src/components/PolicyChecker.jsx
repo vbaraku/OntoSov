@@ -21,6 +21,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Autocomplete,
 } from "@mui/material";
 import {
   Send as SendIcon,
@@ -30,18 +31,37 @@ import {
   Info as InfoIcon,
 } from "@mui/icons-material";
 
-const ACTIONS = ["read", "use", "share", "aggregate", "modify"];
+const ACTIONS = ["read", "use", "share", "aggregate", "modify", "aiTraining"];
+
+const PURPOSE_OPTIONS = [
+  "Service Provision",
+  "Necessary Processing",
+  "Essential Services Only",
+  "Research",
+  "Marketing",
+];
+
+const AI_ALGORITHM_OPTIONS = [
+  { value: "", label: "Any Algorithm" },
+  { value: "federatedLearning", label: "Federated Learning" },
+  { value: "differentialPrivacy", label: "Differential Privacy" },
+  { value: "secureEnclave", label: "Secure Enclave Processing" },
+  { value: "localProcessing", label: "Local Processing Only" },
+];
 
 const PolicyChecker = ({ controllerId }) => {
   const [formData, setFormData] = useState({
     subjectTaxId: "",
     action: "read",
     purpose: "",
+    aiAlgorithm: "",
     dataSource: "",
+    tableName: "",
     dataProperty: "",
     dataDescription: "",
   });
   const [databases, setDatabases] = useState([]);
+  const [tables, setTables] = useState([]);
   const [properties, setProperties] = useState([]);
   const [decision, setDecision] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -71,7 +91,13 @@ const PolicyChecker = ({ controllerId }) => {
   };
 
   const handleDatabaseChange = async (dbId) => {
-    setFormData({ ...formData, dataSource: dbId, dataProperty: "" });
+    setFormData({
+      ...formData,
+      dataSource: dbId,
+      tableName: "",
+      dataProperty: ""
+    });
+    setTables([]);
     setProperties([]);
 
     if (!dbId) return;
@@ -90,26 +116,58 @@ const PolicyChecker = ({ controllerId }) => {
       );
 
       if (response.ok) {
-        const tables = await response.json();
-
-        // Extract all column names from all tables
-        const allColumns = new Set();
-        tables.forEach((table) => {
-          table.columns.forEach((col) => allColumns.add(col.name));
-        });
-
-        setProperties(Array.from(allColumns).sort());
+        const tablesData = await response.json();
+        console.log("Tables data received:", tablesData); // Debug log
+        setTables(tablesData);
       }
     } catch (err) {
-      console.error("Error fetching properties:", err);
+      console.error("Error fetching tables:", err);
+    }
+  };
+
+  const handleTableChange = (tableName) => {
+    setFormData({
+      ...formData,
+      tableName: tableName,
+      dataProperty: ""
+    });
+    setProperties([]);
+
+    if (!tableName) return;
+
+    // Find the selected table and extract its columns
+    const selectedTable = tables.find((t) => t.name === tableName);
+    if (selectedTable) {
+      const columnNames = selectedTable.columns.map((col) => col.name);
+      setProperties(columnNames);
     }
   };
 
   const handleChange = (field) => (event) => {
-    setFormData({
-      ...formData,
-      [field]: event.target.value,
-    });
+    const newValue = event.target.value;
+
+    // If changing action to/from aiTraining, reset related fields
+    if (field === "action") {
+      if (newValue === "aiTraining") {
+        setFormData({
+          ...formData,
+          action: newValue,
+          purpose: "", // Clear purpose when switching to aiTraining
+        });
+      } else {
+        setFormData({
+          ...formData,
+          action: newValue,
+          aiAlgorithm: "", // Clear aiAlgorithm when switching away from aiTraining
+        });
+      }
+    } else {
+      setFormData({
+        ...formData,
+        [field]: newValue,
+      });
+    }
+
     if (validationErrors[field]) {
       setValidationErrors({ ...validationErrors, [field]: null });
     }
@@ -123,14 +181,22 @@ const PolicyChecker = ({ controllerId }) => {
     if (!formData.dataSource) {
       errors.dataSource = "Data source is required";
     }
+    if (!formData.tableName) {
+      errors.tableName = "Table is required";
+    }
     if (!formData.dataProperty) {
       errors.dataProperty = "Data property is required";
     }
-    if (!formData.purpose.trim()) {
-      errors.purpose = "Purpose is required";
-    } else if (formData.purpose.trim().length < 10) {
-      errors.purpose = "Purpose must be at least 10 characters";
+
+    // Purpose validation only for non-aiTraining actions
+    if (formData.action !== "aiTraining") {
+      if (!formData.purpose || !formData.purpose.trim()) {
+        errors.purpose = "Purpose is required";
+      } else if (formData.purpose.trim().length < 10) {
+        errors.purpose = "Purpose must be at least 10 characters";
+      }
     }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -144,15 +210,35 @@ const PolicyChecker = ({ controllerId }) => {
     setDecision(null);
 
     try {
+      // Prepare the request body
+      const requestBody = {
+        controllerId,
+        subjectTaxId: formData.subjectTaxId,
+        action: formData.action,
+        dataSource: formData.dataSource,
+        tableName: formData.tableName,
+        dataProperty: formData.dataProperty,
+        dataDescription: formData.dataDescription,
+      };
+
+      // Add purpose only for non-aiTraining actions
+      if (formData.action !== "aiTraining") {
+        requestBody.purpose = formData.purpose;
+      }
+
+      // Add aiAlgorithm only for aiTraining action
+      if (formData.action === "aiTraining") {
+        requestBody.aiAlgorithm = formData.aiAlgorithm || null;
+      }
+
+      console.log("Submitting request:", requestBody); // Debug log
+
       const response = await fetch(
         "http://localhost:8080/api/controller/check-access",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            controllerId,
-            ...formData,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -175,10 +261,13 @@ const PolicyChecker = ({ controllerId }) => {
       subjectTaxId: "",
       action: "read",
       purpose: "",
+      aiAlgorithm: "",
       dataSource: "",
+      tableName: "",
       dataProperty: "",
       dataDescription: "",
     });
+    setTables([]);
     setProperties([]);
     setValidationErrors({});
     setDecision(null);
@@ -190,10 +279,11 @@ const PolicyChecker = ({ controllerId }) => {
   };
 
   const isPermit = decision?.result === "PERMIT";
+  const isAiTraining = formData.action === "aiTraining";
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" color="text.primary" gutterBottom>
         Policy Checker
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -284,17 +374,61 @@ const PolicyChecker = ({ controllerId }) => {
                 fullWidth
                 margin="normal"
                 required
-                error={!!validationErrors.dataProperty}
+                error={!!validationErrors.tableName}
                 disabled={loading || !formData.dataSource}
               >
-                <InputLabel>Data Property</InputLabel>
+                <InputLabel>Table</InputLabel>
+                <Select
+                  value={formData.tableName}
+                  onChange={(e) => handleTableChange(e.target.value)}
+                  label="Table"
+                >
+                  <MenuItem value="">
+                    <em>Select a table</em>
+                  </MenuItem>
+                  {tables.map((table) => (
+                    <MenuItem key={table.name} value={table.name}>
+                      {table.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {validationErrors.tableName && (
+                  <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    {validationErrors.tableName}
+                  </Typography>
+                )}
+                {!validationErrors.tableName && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    {formData.dataSource
+                      ? "Select which table contains the data"
+                      : "Select a database first"}
+                  </Typography>
+                )}
+              </FormControl>
+
+              <FormControl
+                fullWidth
+                margin="normal"
+                required
+                error={!!validationErrors.dataProperty}
+                disabled={loading || !formData.tableName}
+              >
+                <InputLabel>Column</InputLabel>
                 <Select
                   value={formData.dataProperty}
                   onChange={handleChange("dataProperty")}
-                  label="Data Property"
+                  label="Column"
                 >
                   <MenuItem value="">
-                    <em>Select a property</em>
+                    <em>Select a column</em>
                   </MenuItem>
                   {properties.map((prop) => (
                     <MenuItem key={prop} value={prop}>
@@ -317,9 +451,9 @@ const PolicyChecker = ({ controllerId }) => {
                     color="text.secondary"
                     sx={{ mt: 0.5, ml: 2 }}
                   >
-                    {formData.dataSource
-                      ? "Select which property/column you need"
-                      : "Select a data source first"}
+                    {formData.tableName
+                      ? "Select which column you need"
+                      : "Select a table first"}
                   </Typography>
                 )}
               </FormControl>
@@ -337,28 +471,75 @@ const PolicyChecker = ({ controllerId }) => {
               >
                 {ACTIONS.map((action) => (
                   <MenuItem key={action} value={action}>
-                    {action.charAt(0).toUpperCase() + action.slice(1)}
+                    {action === "aiTraining"
+                      ? "AI Training"
+                      : action.charAt(0).toUpperCase() + action.slice(1)}
                   </MenuItem>
                 ))}
               </TextField>
 
-              <TextField
-                fullWidth
-                label="Purpose"
-                value={formData.purpose}
-                onChange={handleChange("purpose")}
-                error={!!validationErrors.purpose}
-                helperText={
-                  validationErrors.purpose ||
-                  'Explain why you need access (e.g., "Service Provision")'
-                }
-                margin="normal"
-                required
-                multiline
-                rows={3}
-                disabled={loading}
-                placeholder="e.g., Service Provision for order fulfillment"
-              />
+              {/* Conditional rendering: Show Purpose OR AI Algorithm based on action */}
+              {!isAiTraining ? (
+                <Autocomplete
+                  fullWidth
+                  freeSolo
+                  options={PURPOSE_OPTIONS}
+                  value={formData.purpose}
+                  onChange={(event, newValue) => {
+                    setFormData({ ...formData, purpose: newValue || "" });
+                    if (validationErrors.purpose) {
+                      setValidationErrors({ ...validationErrors, purpose: null });
+                    }
+                  }}
+                  onInputChange={(event, newInputValue) => {
+                    setFormData({ ...formData, purpose: newInputValue || "" });
+                    if (validationErrors.purpose) {
+                      setValidationErrors({ ...validationErrors, purpose: null });
+                    }
+                  }}
+                  disabled={loading}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Purpose"
+                      margin="normal"
+                      required
+                      error={!!validationErrors.purpose}
+                      helperText={
+                        validationErrors.purpose ||
+                        "Select a preset or type your own purpose (min 10 characters)"
+                      }
+                      placeholder="e.g., Service Provision"
+                    />
+                  )}
+                />
+              ) : (
+                <FormControl
+                  fullWidth
+                  margin="normal"
+                  disabled={loading}
+                >
+                  <InputLabel>AI Algorithm (Optional)</InputLabel>
+                  <Select
+                    value={formData.aiAlgorithm}
+                    onChange={handleChange("aiAlgorithm")}
+                    label="AI Algorithm (Optional)"
+                  >
+                    {AI_ALGORITHM_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 0.5, ml: 2 }}
+                  >
+                    Specify which AI algorithm you'll use (leave blank for any)
+                  </Typography>
+                </FormControl>
+              )}
 
               <TextField
                 fullWidth
@@ -370,7 +551,7 @@ const PolicyChecker = ({ controllerId }) => {
                 multiline
                 rows={2}
                 disabled={loading}
-                placeholder="e.g., email from ecommerce database"
+                placeholder="e.g., email from patients table for treatment follow-up"
               />
 
               <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
@@ -422,105 +603,107 @@ const PolicyChecker = ({ controllerId }) => {
                     Access {isPermit ? "Permitted" : "Denied"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {new Date().toLocaleString()}
+                    Decision: {decision.result}
                   </Typography>
                 </Box>
               </Box>
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ mb: 2 }}>
-                <Typography
-                  variant="subtitle2"
-                  color="text.secondary"
-                  gutterBottom
-                >
-                  Reason
-                </Typography>
-                <Alert
-                  severity={isPermit ? "success" : "error"}
-                  icon={<InfoIcon />}
-                >
-                  {decision.reason}
-                </Alert>
-              </Box>
+              <List dense>
+                <ListItem>
+                  <ListItemText
+                    primary="Reason"
+                    secondary={decision.reason}
+                    secondaryTypographyProps={{
+                      sx: { whiteSpace: "pre-wrap" },
+                    }}
+                  />
+                </ListItem>
 
-              {decision.policyGroupId && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography
-                    variant="subtitle2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Policy Evaluated
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    <Chip
-                      label={`Policy: ${decision.policyGroupId}`}
-                      size="small"
-                      variant="outlined"
+                {decision.policyGroupId && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Policy Group"
+                      secondary={decision.policyGroupId}
                     />
-                    {decision.policyVersion && (
-                      <Chip
-                        label={`Version: ${decision.policyVersion}`}
-                        size="small"
-                        variant="outlined"
+                    <IconButton
+                      size="small"
+                      onClick={() => copyToClipboard(decision.policyGroupId)}
+                    >
+                      <CopyIcon fontSize="small" />
+                    </IconButton>
+                  </ListItem>
+                )}
+
+                {decision.obligations && decision.obligations.length > 0 && (
+                  <>
+                    <Divider sx={{ my: 1 }} />
+                    <ListItem>
+                      <ListItemText
+                        primary="Obligations"
+                        secondary={
+                          <Box sx={{ mt: 1 }}>
+                            {decision.obligations.map((obligation, index) => (
+                              <Chip
+                                key={index}
+                                label={obligation.action}
+                                size="small"
+                                color="warning"
+                                sx={{ mr: 1, mb: 1 }}
+                              />
+                            ))}
+                          </Box>
+                        }
                       />
-                    )}
-                  </Box>
-                </Box>
-              )}
+                    </ListItem>
+                  </>
+                )}
+              </List>
 
-              {decision.obligations && decision.obligations.length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography
-                    variant="subtitle2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Obligations
+              {isPermit && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Next Steps:</strong> You may proceed with accessing
+                    this data. All obligations listed above must be fulfilled.
+                    This access attempt has been logged on the blockchain.
                   </Typography>
-                  <List dense>
-                    {decision.obligations.map((obligation, index) => (
-                      <ListItem key={index}>
-                        <ListItemText
-                          primary={obligation.type}
-                          secondary={JSON.stringify(obligation.details)}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
+                </Alert>
               )}
 
-              <Box sx={{ display: "flex", gap: 1, mt: 3 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<CopyIcon />}
-                  onClick={() =>
-                    copyToClipboard(JSON.stringify(decision, null, 2))
-                  }
-                >
-                  Copy Response
-                </Button>
-              </Box>
+              {!isPermit && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Access Denied:</strong> The subject's policy does
+                    not permit this access. This denial has been logged on the
+                    blockchain for transparency.
+                  </Typography>
+                </Alert>
+              )}
             </Paper>
           ) : (
-            <Card
-              sx={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <CardContent sx={{ textAlign: "center" }}>
-                <InfoIcon
-                  sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
-                />
-                <Typography variant="h6" color="text.secondary">
-                  Submit a request to see the decision
+            <Card sx={{ height: "100%" }}>
+              <CardContent
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  minHeight: 400,
+                }}
+              >
+                <InfoIcon sx={{ fontSize: 64, color: "action.disabled", mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No Decision Yet
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  align="center"
+                >
+                  Fill out the form and submit your access request to receive a
+                  policy-based decision.
                 </Typography>
               </CardContent>
             </Card>
@@ -530,7 +713,7 @@ const PolicyChecker = ({ controllerId }) => {
 
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={3000}
+        autoHideDuration={2000}
         onClose={() => setSnackbarOpen(false)}
         message="Copied to clipboard"
       />

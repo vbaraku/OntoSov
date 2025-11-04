@@ -84,11 +84,20 @@ public class PolicyEvaluationService {
             schemaOrgProperty = databaseConfigService.resolveSchemaOrgProperty(
                     request.getControllerId(),
                     request.getDataSource(),
+                    request.getTableName(),
                     request.getDataProperty()
             );
 
             if (schemaOrgProperty == null) {
-                return createDenyDecision("No Schema.org mapping found for column: " + request.getDataProperty());
+                // No Schema.org mapping means this column is not governed by subject policies
+                // Default to PERMIT - subjects can only restrict mapped data
+                PolicyDecisionDTO decision = new PolicyDecisionDTO();
+                decision.setResult(DecisionResult.PERMIT);
+                decision.setReason("No Schema.org mapping found for column '" + request.getDataProperty() +
+                        "' in table '" + request.getTableName() +
+                        "'. Unmapped data is not governed by subject policies - access permitted by default.");
+                decision.setObligations(new ArrayList<>());
+                return decision;
             }
 
             System.out.println("Resolved identifiers:");
@@ -101,31 +110,47 @@ public class PolicyEvaluationService {
             return createDenyDecision("Error resolving mappings: " + e.getMessage());
         }
 
-        // 5. Check policies using the identifiers
+        // 5. Check if ANY policy exists for this data element
+        boolean policyExists = odrlService.policyExistsForProperty(
+                subject.getId(),
+                dataSourceIdentifier,
+                schemaOrgProperty
+        );
+
+        // If NO policy exists, default to PERMIT
+        if (!policyExists) {
+            PolicyDecisionDTO decision = new PolicyDecisionDTO();
+            decision.setResult(DecisionResult.PERMIT);
+            decision.setReason("No policy assigned to this data - access permitted by default");
+            decision.setObligations(new ArrayList<>());
+            return decision;
+        }
+
+        // 6. Policy exists - check if it permits the requested action
         boolean hasAccessPermission = odrlService.checkPropertyAccess(
                 subject.getId(),
                 request.getControllerId(),
-                dataSourceIdentifier,  // Use "controllerName - databaseName" format!
+                dataSourceIdentifier,
                 schemaOrgProperty,
                 request.getAction()
         );
 
-        System.out.println("Checking policy access with:");
+        System.out.println("=== PERMISSION CHECK ===");
         System.out.println("  subjectId: " + subject.getId());
         System.out.println("  controllerId: " + request.getControllerId());
-        System.out.println("  dataSource: " + request.getDataSource());
+        System.out.println("  dataSource: " + dataSourceIdentifier);
         System.out.println("  schemaProperty: " + schemaOrgProperty);
         System.out.println("  action: " + request.getAction());
-
+        System.out.println("  hasAccessPermission: " + hasAccessPermission);
 
         if (!hasAccessPermission) {
             return createDenyDecision(
-                    "No policy permits '" + request.getAction() + "' access to " +
+                    "Policy exists but does not permit '" + request.getAction() + "' access to " +
                             schemaOrgProperty + " from " + dataSourceIdentifier
             );
         }
 
-        // 5. Policy exists and permits access - now find which policy group
+        // 7. Policy exists and permits access - now find which policy group
         PolicyGroupDTO applicablePolicy = findApplicablePolicyGroup(
                 subject.getId(),
                 dataSourceIdentifier,
@@ -136,17 +161,17 @@ public class PolicyEvaluationService {
             return createDenyDecision("Policy found but group details unavailable");
         }
 
-        // 6. Check constraints (purpose, expiration)
+        // 8. Check constraints (purpose, expiration)
         if (!checkConstraints(applicablePolicy, request)) {
             return createDenyDecision("Policy constraints not satisfied (purpose/expiration)");
         }
 
-        // 7. Check AI restrictions if applicable
+        // 9. Check AI restrictions if applicable
         if (!checkAiRestrictions(applicablePolicy, request)) {
             return createDenyDecision("AI training restrictions not satisfied");
         }
 
-        // 8. All checks passed - PERMIT with obligations
+        // 10. All checks passed - PERMIT with obligations
         List<ObligationDTO> obligations = collectObligations(applicablePolicy);
         return createPermitDecision(applicablePolicy, obligations);
     }
@@ -211,21 +236,23 @@ public class PolicyEvaluationService {
             return true;
         }
 
-        // Check purpose constraint
-        if (constraints.containsKey("purpose")) {
-            String requiredPurpose = constraints.get("purpose").toString().trim();
-            if (!requiredPurpose.isEmpty()) {
-                String requestPurpose = request.getPurpose();
-                if (requestPurpose == null || requestPurpose.trim().isEmpty()) {
-                    return false;
-                }
-                if (!requestPurpose.toLowerCase().contains(requiredPurpose.toLowerCase())) {
-                    return false;
+        // Check purpose constraint - SKIP for aiTraining action
+        if (!"aiTraining".equals(request.getAction())) {
+            if (constraints.containsKey("purpose")) {
+                String requiredPurpose = constraints.get("purpose").toString().trim();
+                if (!requiredPurpose.isEmpty()) {
+                    String requestPurpose = request.getPurpose();
+                    if (requestPurpose == null || requestPurpose.trim().isEmpty()) {
+                        return false;
+                    }
+                    if (!requestPurpose.toLowerCase().contains(requiredPurpose.toLowerCase())) {
+                        return false;
+                    }
                 }
             }
         }
 
-        // Check expiration constraint
+        // Check expiration constraint (always check regardless of action)
         if (constraints.containsKey("expiration")) {
             String expirationStr = constraints.get("expiration").toString().trim();
             if (!expirationStr.isEmpty()) {
@@ -235,6 +262,7 @@ public class PolicyEvaluationService {
                         return false;
                     }
                 } catch (Exception e) {
+                    System.err.println("Error parsing expiration date: " + e.getMessage());
                     return false;
                 }
             }
@@ -244,31 +272,42 @@ public class PolicyEvaluationService {
     }
 
     /**
-     * Checks if AI restrictions are satisfied
+     * Checks if the request satisfies AI training restrictions
      */
     private boolean checkAiRestrictions(PolicyGroupDTO policy, AccessRequestDTO request) {
+        // Only check AI restrictions if the action is aiTraining
+        if (!"aiTraining".equals(request.getAction())) {
+            return true; // No AI restrictions apply to non-AI actions
+        }
+
         Map<String, Object> aiRestrictions = policy.getAiRestrictions();
 
         if (aiRestrictions == null || aiRestrictions.isEmpty()) {
-            return true;
+            return true; // No AI restrictions defined
         }
 
-        // Check if AI training is allowed
+        // Check if AI training is allowed at all
         if (aiRestrictions.containsKey("allowAiTraining")) {
-            boolean allowAiTraining = (boolean) aiRestrictions.get("allowAiTraining");
-
-            if (!allowAiTraining && isAiRelatedPurpose(request.getPurpose())) {
-                return false;
+            Boolean allowAiTraining = (Boolean) aiRestrictions.get("allowAiTraining");
+            if (Boolean.FALSE.equals(allowAiTraining)) {
+                return false; // AI training is explicitly prohibited
             }
+        }
 
-            // If training is allowed but restricted to specific algorithms
-            if (allowAiTraining && aiRestrictions.containsKey("aiAlgorithm")) {
-                String allowedAlgorithm = aiRestrictions.get("aiAlgorithm").toString().trim();
-                if (!allowedAlgorithm.isEmpty()) {
-                    String purposeLower = request.getPurpose().toLowerCase();
-                    if (!purposeLower.contains(allowedAlgorithm.toLowerCase())) {
-                        return false;
-                    }
+        // Check if a specific algorithm is required
+        if (aiRestrictions.containsKey("aiAlgorithm")) {
+            String requiredAlgorithm = aiRestrictions.get("aiAlgorithm").toString().trim();
+            if (!requiredAlgorithm.isEmpty()) {
+                String requestedAlgorithm = request.getAiAlgorithm();
+
+                // If policy requires a specific algorithm but request doesn't specify one
+                if (requestedAlgorithm == null || requestedAlgorithm.trim().isEmpty()) {
+                    return false; // Must specify an algorithm
+                }
+
+                // Check if requested algorithm matches the required one
+                if (!requiredAlgorithm.equalsIgnoreCase(requestedAlgorithm.trim())) {
+                    return false; // Algorithm mismatch
                 }
             }
         }

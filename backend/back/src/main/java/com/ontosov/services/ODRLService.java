@@ -135,6 +135,14 @@ public class ODRLService {
                                         policyGroup.getAiRestrictions());
                             }
                         }
+
+                        // Explicitly create aiTraining policy if AI restrictions exist
+                        if (policyGroup.getAiRestrictions() != null && !policyGroup.getAiRestrictions().isEmpty()) {
+                            createPropertyPolicy(policyGroupId, subjectId, dataSource, property, "aiTraining",
+                                    policyGroup.getConstraints(),
+                                    policyGroup.getConsequences(),
+                                    policyGroup.getAiRestrictions());
+                        }
                     }
                 }
             }
@@ -156,6 +164,14 @@ public class ODRLService {
                                         policyGroup.getConsequences(),
                                         policyGroup.getAiRestrictions());
                             }
+                        }
+
+                        // Explicitly create aiTraining policy if AI restrictions exist
+                        if (policyGroup.getAiRestrictions() != null && !policyGroup.getAiRestrictions().isEmpty()) {
+                            createEntityPolicy(policyGroupId, subjectId, dataSource, entityType, entityId, "aiTraining",
+                                    policyGroup.getConstraints(),
+                                    policyGroup.getConsequences(),
+                                    policyGroup.getAiRestrictions());
                         }
                     }
                 }
@@ -551,6 +567,36 @@ public class ODRLService {
                     "          onto:entityId \"" + entityId + "\" .\n" +
                     "  FILTER(?assignee = onto:controller-" + controllerId + " || " +
                     "         ?assignee = onto:allControllers)\n" +
+                    "}";
+
+            Query query = QueryFactory.create(queryString);
+            try (QueryExecution qexec = QueryExecutionFactory.create(query, odrlModel)) {
+                return qexec.execAsk();
+            }
+        } finally {
+            dataset.end();
+        }
+    }
+
+    /**
+     * Check if ANY policy exists for a given property (regardless of permissions)
+     * Used to distinguish between "no policy" vs "policy denies access"
+     */
+    public boolean policyExistsForProperty(Long subjectId, String dataSource, String property) {
+        dataset.begin(ReadWrite.READ);
+
+        try {
+            String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
+                    "PREFIX odrl: <" + ODRL_NS + ">\n" +
+                    "PREFIX rdf: <" + RDF.getURI() + ">\n" +
+                    "ASK {\n" +
+                    "  ?policy rdf:type odrl:Policy .\n" +
+                    "  ?policy ?permissionOrProhibition ?permOrProhib .\n" +
+                    "  ?permOrProhib odrl:target ?target ;\n" +
+                    "                odrl:assigner onto:subject-" + subjectId + " .\n" +
+                    "  ?target onto:dataSource \"" + dataSource + "\" ;\n" +
+                    "          onto:dataProperty \"" + property + "\" .\n" +
+                    "  FILTER(?permissionOrProhibition = odrl:permission || ?permissionOrProhibition = odrl:prohibition)\n" +
                     "}";
 
             Query query = QueryFactory.create(queryString);
