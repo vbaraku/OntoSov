@@ -791,15 +791,6 @@ const PolicyChecker = ({ controllerId }) => {
                         </IconButton>
                       </ListItem>
                     )}
-
-                    {decision.policyVersion && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Policy Version"
-                          secondary={`Version ${decision.policyVersion}`}
-                        />
-                      </ListItem>
-                    )}
                   </List>
 
                   {/* Obligations Section */}
