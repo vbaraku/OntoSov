@@ -39,18 +39,43 @@ public class PolicyEvaluationService {
             return createDenyDecision("Invalid request: missing subject or action");
         }
 
-        // 2. Validate data-specific fields
-        if (request.getDataSource() == null || request.getDataProperty() == null) {
-            return createDenyDecision("Invalid request: must specify dataSource and dataProperty");
+        // 2. Determine request type and route to appropriate handler
+        boolean isEntityRequest = request.getRecordId() != null && !request.getRecordId().trim().isEmpty();
+        boolean isPropertyRequest = request.getDataProperty() != null && !request.getDataProperty().trim().isEmpty();
+
+        if (!isEntityRequest && !isPropertyRequest) {
+            return createDenyDecision("Invalid request: must specify either dataProperty (for property check) or recordId (for entity check)");
         }
 
-        // 3. Find the subject by tax ID
+        if (isEntityRequest && isPropertyRequest) {
+            return createDenyDecision("Invalid request: cannot specify both dataProperty and recordId");
+        }
+
+        // Route to appropriate evaluation method
+        if (isEntityRequest) {
+            return evaluateEntityAccess(request);
+        } else {
+            return evaluatePropertyAccess(request);
+        }
+    }
+
+    /**
+     * Evaluates property-level access (column access)
+     */
+    private PolicyDecisionDTO evaluatePropertyAccess(AccessRequestDTO request) {
+
+        // 1. Validate data-specific fields
+        if (request.getDataSource() == null || request.getDataProperty() == null || request.getTableName() == null) {
+            return createDenyDecision("Invalid request: must specify dataSource, tableName, and dataProperty");
+        }
+
+        // 2. Find the subject by tax ID
         User subject = userRepo.findByTaxid(request.getSubjectTaxId());
         if (subject == null) {
             return createDenyDecision("Subject not found with tax ID: " + request.getSubjectTaxId());
         }
 
-        // 4. Resolve identifiers to match the format used in policy storage
+        // 3. Resolve identifiers to match the format used in policy storage
         String databaseName;
         String schemaOrgProperty;
         String controllerName;
@@ -80,7 +105,7 @@ public class PolicyEvaluationService {
             // Format dataSource the same way as in the Subject UI
             dataSourceIdentifier = controllerName + " - " + databaseName;
 
-            // Resolve column to Schema.org property
+            // Resolve column to Schema.org property (4 parameters!)
             schemaOrgProperty = databaseConfigService.resolveSchemaOrgProperty(
                     request.getControllerId(),
                     request.getDataSource(),
@@ -89,13 +114,10 @@ public class PolicyEvaluationService {
             );
 
             if (schemaOrgProperty == null) {
-                // No Schema.org mapping means this column is not governed by subject policies
-                // Default to PERMIT - subjects can only restrict mapped data
+                // Unmapped data - PERMIT by default
                 PolicyDecisionDTO decision = new PolicyDecisionDTO();
                 decision.setResult(DecisionResult.PERMIT);
-                decision.setReason("No Schema.org mapping found for column '" + request.getDataProperty() +
-                        "' in table '" + request.getTableName() +
-                        "'. Unmapped data is not governed by subject policies - access permitted by default.");
+                decision.setReason("Unmapped data is not governed by subject policies - access permitted by default.");
                 decision.setObligations(new ArrayList<>());
                 return decision;
             }
@@ -110,15 +132,9 @@ public class PolicyEvaluationService {
             return createDenyDecision("Error resolving mappings: " + e.getMessage());
         }
 
-        // 5. Check if ANY policy exists for this data element
-        boolean policyExists = odrlService.policyExistsForProperty(
-                subject.getId(),
-                dataSourceIdentifier,
-                schemaOrgProperty
-        );
-
-        // If NO policy exists, default to PERMIT
-        if (!policyExists) {
+        // 4. Check if any policy exists for this property
+        if (!odrlService.policyExistsForProperty(subject.getId(), dataSourceIdentifier, schemaOrgProperty)) {
+            // No policy assigned - PERMIT by default
             PolicyDecisionDTO decision = new PolicyDecisionDTO();
             decision.setResult(DecisionResult.PERMIT);
             decision.setReason("No policy assigned to this data - access permitted by default");
@@ -126,7 +142,7 @@ public class PolicyEvaluationService {
             return decision;
         }
 
-        // 6. Policy exists - check if it permits the requested action
+        // 5. Check policies using the identifiers
         boolean hasAccessPermission = odrlService.checkPropertyAccess(
                 subject.getId(),
                 request.getControllerId(),
@@ -135,22 +151,21 @@ public class PolicyEvaluationService {
                 request.getAction()
         );
 
-        System.out.println("=== PERMISSION CHECK ===");
+        System.out.println("Checking policy access with:");
         System.out.println("  subjectId: " + subject.getId());
         System.out.println("  controllerId: " + request.getControllerId());
-        System.out.println("  dataSource: " + dataSourceIdentifier);
+        System.out.println("  dataSource: " + request.getDataSource());
         System.out.println("  schemaProperty: " + schemaOrgProperty);
         System.out.println("  action: " + request.getAction());
-        System.out.println("  hasAccessPermission: " + hasAccessPermission);
 
         if (!hasAccessPermission) {
             return createDenyDecision(
-                    "Policy exists but does not permit '" + request.getAction() + "' access to " +
+                    "No policy permits '" + request.getAction() + "' access to " +
                             schemaOrgProperty + " from " + dataSourceIdentifier
             );
         }
 
-        // 7. Policy exists and permits access - now find which policy group
+        // 6. Policy exists and permits access - now find which policy group
         PolicyGroupDTO applicablePolicy = findApplicablePolicyGroup(
                 subject.getId(),
                 dataSourceIdentifier,
@@ -161,19 +176,181 @@ public class PolicyEvaluationService {
             return createDenyDecision("Policy found but group details unavailable");
         }
 
-        // 8. Check constraints (purpose, expiration)
+        // 7. Check constraints (purpose, expiration)
         if (!checkConstraints(applicablePolicy, request)) {
             return createDenyDecision("Policy constraints not satisfied (purpose/expiration)");
         }
 
-        // 9. Check AI restrictions if applicable
+        // 8. Check AI restrictions if applicable
         if (!checkAiRestrictions(applicablePolicy, request)) {
             return createDenyDecision("AI training restrictions not satisfied");
         }
 
-        // 10. All checks passed - PERMIT with obligations
+        // 9. All checks passed - PERMIT with obligations
         List<ObligationDTO> obligations = collectObligations(applicablePolicy);
         return createPermitDecision(applicablePolicy, obligations);
+    }
+
+    /**
+     * Evaluates entity-level access (row/record access)
+     */
+    private PolicyDecisionDTO evaluateEntityAccess(AccessRequestDTO request) {
+
+        // 1. Validate data-specific fields
+        if (request.getDataSource() == null || request.getRecordId() == null || request.getTableName() == null) {
+            return createDenyDecision("Invalid request: must specify dataSource, tableName, and recordId");
+        }
+
+        // 2. Find the subject by tax ID
+        User subject = userRepo.findByTaxid(request.getSubjectTaxId());
+        if (subject == null) {
+            return createDenyDecision("Subject not found with tax ID: " + request.getSubjectTaxId());
+        }
+
+        // 3. Resolve identifiers to match the format used in policy storage
+        String databaseName;
+        String controllerName;
+        String dataSourceIdentifier;
+        String entityUri;
+
+        try {
+            // Get controller name
+            User controller = userRepo.findById(request.getControllerId()).orElse(null);
+            if (controller == null) {
+                return createDenyDecision("Controller not found");
+            }
+            controllerName = controller.getName();
+
+            // Get database name from UUID
+            List<DatabaseConfigDTO> databases = databaseConfigService.getDatabasesForController(request.getControllerId());
+            DatabaseConfigDTO database = databases.stream()
+                    .filter(db -> db.getId().equals(request.getDataSource()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (database == null) {
+                return createDenyDecision("Database not found: " + request.getDataSource());
+            }
+
+            databaseName = database.getDatabaseName();
+
+            // Format dataSource the same way as in the Subject UI
+            dataSourceIdentifier = controllerName + " - " + databaseName;
+
+            // Resolve table to entity type and construct full URI
+            String entityType = databaseConfigService.resolveEntityTypeFromTable(
+                    request.getControllerId(),
+                    request.getDataSource(),
+                    request.getTableName()
+            );
+
+            if (entityType == null) {
+                // Unmapped table - PERMIT by default
+                PolicyDecisionDTO decision = new PolicyDecisionDTO();
+                decision.setResult(DecisionResult.PERMIT);
+                decision.setReason("Unmapped table is not governed by subject policies - access permitted by default.");
+                decision.setObligations(new ArrayList<>());
+                return decision;
+            }
+
+            // Construct full entity URI: http://example.org/resource#EntityType/recordId
+            entityUri = "http://example.org/resource#" + entityType + "/" + request.getRecordId();
+
+            System.out.println("Resolved identifiers for entity access:");
+            System.out.println("  Controller name: " + controllerName);
+            System.out.println("  Database name: " + databaseName);
+            System.out.println("  DataSource identifier: " + dataSourceIdentifier);
+            System.out.println("  Table -> EntityType: " + request.getTableName() + " -> " + entityType);
+            System.out.println("  Entity URI: " + entityUri);
+
+        } catch (IOException e) {
+            return createDenyDecision("Error resolving mappings: " + e.getMessage());
+        }
+
+        // 4. Check if any policy exists for this entity
+        if (!odrlService.policyExistsForEntity(subject.getId(), dataSourceIdentifier, entityUri)) {
+            // No policy assigned - PERMIT by default
+            PolicyDecisionDTO decision = new PolicyDecisionDTO();
+            decision.setResult(DecisionResult.PERMIT);
+            decision.setReason("No policy assigned to this entity - access permitted by default");
+            decision.setObligations(new ArrayList<>());
+            return decision;
+        }
+
+        // 5. Check policies using the identifiers
+        boolean hasAccessPermission = odrlService.checkEntityAccess(
+                subject.getId(),
+                request.getControllerId(),
+                dataSourceIdentifier,
+                entityUri,
+                request.getAction()
+        );
+
+        System.out.println("Checking entity policy access with:");
+        System.out.println("  subjectId: " + subject.getId());
+        System.out.println("  controllerId: " + request.getControllerId());
+        System.out.println("  dataSource: " + dataSourceIdentifier);
+        System.out.println("  entityUri: " + entityUri);
+        System.out.println("  action: " + request.getAction());
+
+        if (!hasAccessPermission) {
+            return createDenyDecision(
+                    "No policy permits '" + request.getAction() + "' access to entity " +
+                            entityUri + " from " + dataSourceIdentifier
+            );
+        }
+
+        // 6. Policy exists and permits access - now find which policy group
+        PolicyGroupDTO applicablePolicy = findApplicablePolicyGroupForEntity(
+                subject.getId(),
+                dataSourceIdentifier,
+                entityUri
+        );
+
+        if (applicablePolicy == null) {
+            return createDenyDecision("Policy found but group details unavailable");
+        }
+
+        // 7. Check constraints (purpose, expiration)
+        if (!checkConstraints(applicablePolicy, request)) {
+            return createDenyDecision("Policy constraints not satisfied (purpose/expiration)");
+        }
+
+        // 8. Check AI restrictions if applicable
+        if (!checkAiRestrictions(applicablePolicy, request)) {
+            return createDenyDecision("AI training restrictions not satisfied");
+        }
+
+        // 9. All checks passed - PERMIT with obligations
+        List<ObligationDTO> obligations = collectObligations(applicablePolicy);
+        return createPermitDecision(applicablePolicy, obligations);
+    }
+
+    /**
+     * Find which policy group is assigned to this specific entity (entity-level)
+     */
+    private PolicyGroupDTO findApplicablePolicyGroupForEntity(Long subjectId, String dataSource, String entityId) {
+        // Get all policy groups for this subject
+        List<PolicyGroupDTO> allGroups = policyGroupService.getPolicyGroupsBySubject(subjectId);
+
+        // Check each group to see if it's assigned to the requested entity
+        for (PolicyGroupDTO group : allGroups) {
+            // Get assignments for this group
+            Map<String, Object> assignments = odrlService.getAssignmentsForPolicyGroup(group.getId(), subjectId);
+
+            // Check entity assignments
+            @SuppressWarnings("unchecked")
+            Map<String, Set<String>> entityAssignments =
+                    (Map<String, Set<String>>) assignments.get("entityAssignments");
+
+            if (entityAssignments != null &&
+                    entityAssignments.containsKey(dataSource) &&
+                    entityAssignments.get(dataSource).contains(entityId)) {
+                return group;
+            }
+        }
+
+        return null;
     }
 
     /**

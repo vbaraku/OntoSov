@@ -441,6 +441,57 @@ public class DatabaseConfigService {
         return null;
     }
 
+    /**
+     * Resolve table name to Schema.org entity type by parsing OBDA mapping
+     * Example: "medical_records" table -> "MedicalEntity" entity type
+     */
+    public String resolveEntityTypeFromTable(
+            Long controllerId,
+            String databaseId,
+            String tableName
+    ) throws IOException {
+        String obdaPath = getObdaPath(controllerId, getDatabaseNameFromId(controllerId, databaseId));
+
+        if (!Files.exists(Paths.get(obdaPath))) {
+            return null;
+        }
+
+        List<String> lines = Files.readAllLines(Paths.get(obdaPath));
+
+        // Look for the mapping for this specific table
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+
+            // Check if this is a mappingId line for our table
+            if (line.startsWith("mappingId") && line.contains(tableName)) {
+                // Look at the target line (next line after mappingId)
+                if (i + 1 < lines.size()) {
+                    String targetLine = lines.get(i + 1).trim();
+
+                    // Extract entity type from target line
+                    // Pattern: :EntityType/{primary_key} a schema:EntityType
+                    // Example: :MedicalEntity/{record_id} a schema:MedicalEntity
+
+                    // First pattern: :EntityType/{...}
+                    Pattern pattern1 = Pattern.compile(":(\\w+)/\\{");
+                    Matcher matcher1 = pattern1.matcher(targetLine);
+                    if (matcher1.find()) {
+                        return matcher1.group(1);
+                    }
+
+                    // Second pattern: a schema:EntityType
+                    Pattern pattern2 = Pattern.compile("a schema:(\\w+)");
+                    Matcher matcher2 = pattern2.matcher(targetLine);
+                    if (matcher2.find()) {
+                        return matcher2.group(1);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
     // Helper method to get database name from UUID
     private String getDatabaseNameFromId(Long controllerId, String databaseId) throws IOException {
         List<DatabaseConfigDTO> databases = getDatabasesForController(controllerId);

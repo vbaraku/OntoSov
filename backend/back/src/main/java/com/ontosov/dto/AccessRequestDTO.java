@@ -14,7 +14,8 @@ public class AccessRequestDTO {
     private String purpose;             // "Service Provision", "Research", etc. (not used for aiTraining)
     private String dataDescription;     // Brief description of what data
     private String dataSource;          // database ID from getDatabasesForController
-    private String tableName;           // NEW: table name
+    private String tableName;           // table name
     private String dataProperty;        // column name from getDatabaseTables
     private String aiAlgorithm;         // AI algorithm for aiTraining action (optional)
+    private String recordId;            // record primary key (for entity-level checks)
 }

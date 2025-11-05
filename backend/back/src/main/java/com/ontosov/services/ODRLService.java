@@ -608,6 +608,36 @@ public class ODRLService {
         }
     }
 
+    /**
+     * Check if ANY policy exists for a given entity (regardless of permissions)
+     * Used to distinguish between "no policy" vs "policy denies access"
+     */
+    public boolean policyExistsForEntity(Long subjectId, String dataSource, String entityId) {
+        dataset.begin(ReadWrite.READ);
+
+        try {
+            String queryString = "PREFIX onto: <" + ONTOSOV_NS + ">\n" +
+                    "PREFIX odrl: <" + ODRL_NS + ">\n" +
+                    "PREFIX rdf: <" + RDF.getURI() + ">\n" +
+                    "ASK {\n" +
+                    "  ?policy rdf:type odrl:Policy .\n" +
+                    "  ?policy ?permissionOrProhibition ?permOrProhib .\n" +
+                    "  ?permOrProhib odrl:target ?target ;\n" +
+                    "                odrl:assigner onto:subject-" + subjectId + " .\n" +
+                    "  ?target onto:dataSource \"" + dataSource + "\" ;\n" +
+                    "          onto:entityId \"" + entityId + "\" .\n" +
+                    "  FILTER(?permissionOrProhibition = odrl:permission || ?permissionOrProhibition = odrl:prohibition)\n" +
+                    "}";
+
+            Query query = QueryFactory.create(queryString);
+            try (QueryExecution qexec = QueryExecutionFactory.create(query, odrlModel)) {
+                return qexec.execAsk();
+            }
+        } finally {
+            dataset.end();
+        }
+    }
+
     public Map<String, Object> getAssignmentsForPolicyGroup(String groupId, Long subjectId) {
         Map<String, Set<String>> propertyAssignments = new HashMap<>();
         Map<String, Set<String>> entityAssignments = new HashMap<>();
