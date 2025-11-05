@@ -657,9 +657,9 @@ const PolicyChecker = ({ controllerId }) => {
                   p: 3,
                   border: 2,
                   borderColor: isPermit ? "success.main" : "error.main",
+                  flexGrow: 1,
                   display: "flex",
                   flexDirection: "column",
-                  maxHeight: "100%",
                 }}
               >
                 {/* Header with Decision Result */}
@@ -855,17 +855,10 @@ const PolicyChecker = ({ controllerId }) => {
 
                   {!isPermit && (
                     <Alert severity="error">
-                      <Typography variant="body2" gutterBottom>
-                        <strong>Access Denied</strong>
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        The subject's policy does not permit {formData.action} access to{' '}
-                        {currentTab === 0 ? `column "${formData.dataProperty}"` : `record #${formData.recordId}`}{' '}
-                        in {formData.tableName}.
-                      </Typography>
                       <Typography variant="body2">
-                        This denial has been logged on the blockchain for transparency.
-                        Review the reason above and consider adjusting your request (e.g., purpose, action type, or AI algorithm).
+                        <strong>Access Denied:</strong> The subject's policy does
+                        not permit this access. This denial has been logged on the
+                        blockchain for transparency.
                       </Typography>
                     </Alert>
                   )}
