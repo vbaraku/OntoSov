@@ -657,9 +657,9 @@ const PolicyChecker = ({ controllerId }) => {
                   p: 3,
                   border: 2,
                   borderColor: isPermit ? "success.main" : "error.main",
-                  flexGrow: 1,
                   display: "flex",
                   flexDirection: "column",
+                  maxHeight: "100%",
                 }}
               >
                 {/* Header with Decision Result */}
@@ -710,16 +710,24 @@ const PolicyChecker = ({ controllerId }) => {
                           {formData.action}
                         </Typography>
                       </Grid>
-                      <Grid item xs={12}>
+                      <Grid item xs={6}>
                         <Typography variant="caption" color="text.secondary">
-                          Database / Table
+                          Database
                         </Typography>
                         <Typography variant="body2" fontWeight="medium">
-                          {databases.find(d => d.id === formData.dataSource)?.databaseName || 'N/A'} / {formData.tableName}
+                          {databases.find(d => d.id === formData.dataSource)?.databaseName || 'N/A'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="caption" color="text.secondary">
+                          Table
+                        </Typography>
+                        <Typography variant="body2" fontWeight="medium">
+                          {formData.tableName}
                         </Typography>
                       </Grid>
                       {currentTab === 0 && formData.dataProperty && (
-                        <Grid item xs={12}>
+                        <Grid item xs={6}>
                           <Typography variant="caption" color="text.secondary">
                             Column
                           </Typography>
@@ -729,7 +737,7 @@ const PolicyChecker = ({ controllerId }) => {
                         </Grid>
                       )}
                       {currentTab === 1 && formData.recordId && (
-                        <Grid item xs={12}>
+                        <Grid item xs={6}>
                           <Typography variant="caption" color="text.secondary">
                             Record ID
                           </Typography>
@@ -739,7 +747,7 @@ const PolicyChecker = ({ controllerId }) => {
                         </Grid>
                       )}
                       {formData.purpose && (
-                        <Grid item xs={12}>
+                        <Grid item xs={currentTab === 0 && formData.dataProperty ? 6 : 12}>
                           <Typography variant="caption" color="text.secondary">
                             Purpose
                           </Typography>
@@ -748,8 +756,8 @@ const PolicyChecker = ({ controllerId }) => {
                           </Typography>
                         </Grid>
                       )}
-                      {formData.aiAlgorithm && (
-                        <Grid item xs={12}>
+                      {formData.action === 'aiTraining' && formData.aiAlgorithm && (
+                        <Grid item xs={6}>
                           <Typography variant="caption" color="text.secondary">
                             AI Algorithm
                           </Typography>
@@ -793,56 +801,42 @@ const PolicyChecker = ({ controllerId }) => {
                     )}
                   </List>
 
-                  {/* Obligations Section */}
+                  {/* Consequences Section */}
                   {decision.obligations && decision.obligations.length > 0 && (
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="h6" gutterBottom>
-                        Obligations
+                        Consequences if Not Respected
                       </Typography>
                       <Alert severity="warning" sx={{ mb: 1 }}>
                         <Typography variant="body2" fontWeight="medium">
-                          You must fulfill these obligations:
+                          You must fulfill the following:
                         </Typography>
                       </Alert>
-                      <List dense>
+                      <Box sx={{ pl: 2 }}>
                         {decision.obligations.map((obligation, index) => (
-                          <ListItem
-                            key={index}
-                            sx={{
-                              flexDirection: "column",
-                              alignItems: "flex-start",
-                              bgcolor: "warning.lighter",
-                              mb: 1,
-                              borderRadius: 1,
-                              border: 1,
-                              borderColor: "warning.light"
-                            }}
-                          >
-                            <Box sx={{ width: "100%", mb: 1 }}>
-                              <Chip
-                                label={obligation.type?.toUpperCase() || "OBLIGATION"}
-                                size="small"
-                                color="warning"
-                                sx={{ fontWeight: "bold" }}
-                              />
-                            </Box>
+                          <Box key={index} sx={{ mb: 1.5 }}>
+                            <Typography variant="body2" fontWeight="bold" color="warning.dark">
+                              {obligation.type === 'notify' ? 'Notification Required' :
+                               obligation.type === 'compensate' ? 'Compensation Required' :
+                               obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
+                            </Typography>
                             {obligation.details && Object.keys(obligation.details).length > 0 && (
-                              <Box sx={{ width: "100%", pl: 1 }}>
+                              <Box sx={{ pl: 1, mt: 0.5 }}>
                                 {Object.entries(obligation.details).map(([key, value]) => (
                                   <Typography
                                     key={key}
                                     variant="body2"
-                                    sx={{ mb: 0.5 }}
+                                    color="text.secondary"
                                   >
-                                    <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
+                                    • {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
                                   </Typography>
                                 ))}
                               </Box>
                             )}
-                          </ListItem>
+                          </Box>
                         ))}
-                      </List>
+                      </Box>
                     </>
                   )}
 
@@ -853,7 +847,7 @@ const PolicyChecker = ({ controllerId }) => {
                       <Typography variant="body2">
                         <strong>Next Steps:</strong> You may proceed with accessing
                         this data. {decision.obligations && decision.obligations.length > 0 &&
-                        "All obligations listed above must be fulfilled. "}
+                        "All consequences listed above must be fulfilled. "}
                         This access attempt has been logged on the blockchain for transparency.
                       </Typography>
                     </Alert>
@@ -861,10 +855,17 @@ const PolicyChecker = ({ controllerId }) => {
 
                   {!isPermit && (
                     <Alert severity="error">
+                      <Typography variant="body2" gutterBottom>
+                        <strong>Access Denied</strong>
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        The subject's policy does not permit {formData.action} access to{' '}
+                        {currentTab === 0 ? `column "${formData.dataProperty}"` : `record #${formData.recordId}`}{' '}
+                        in {formData.tableName}.
+                      </Typography>
                       <Typography variant="body2">
-                        <strong>Access Denied:</strong> The subject's policy does
-                        not permit this access. This denial has been logged on the
-                        blockchain for transparency. Review the reason above and adjust your request accordingly.
+                        This denial has been logged on the blockchain for transparency.
+                        Review the reason above and consider adjusting your request (e.g., purpose, action type, or AI algorithm).
                       </Typography>
                     </Alert>
                   )}
