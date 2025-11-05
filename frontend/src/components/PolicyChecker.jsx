@@ -206,8 +206,6 @@ const PolicyChecker = ({ controllerId }) => {
     if (formData.action !== "aiTraining") {
       if (!formData.purpose || !formData.purpose.trim()) {
         errors.purpose = "Purpose is required";
-      } else if (formData.purpose.trim().length < 10) {
-        errors.purpose = "Purpose must be at least 10 characters";
       }
     }
 
@@ -581,7 +579,7 @@ const PolicyChecker = ({ controllerId }) => {
                       error={!!validationErrors.purpose}
                       helperText={
                         validationErrors.purpose ||
-                        "Select a preset or type your own purpose (min 10 characters)"
+                        "Select a preset or type your own purpose"
                       }
                       placeholder="e.g., Service Provision"
                     />
