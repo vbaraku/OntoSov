@@ -5,6 +5,7 @@ import PolicyDetailsDialog from "../components/PolicyDetailsDialog";
 import SubjectAccessHistory from "../components/SubjectAccessHistory";
 import SkeletonSubjectLoading from "../components/SkeletonSubjectLoading";
 import DataExport from "../components/DataExport";
+import ProtectAllDataDialog from "../components/ProtectAllDataDialog";
 import {
   Box,
   Typography,
@@ -34,6 +35,7 @@ import {
   Tab,
   tableCellClasses,
   styled,
+  Snackbar
 } from "@mui/material";
 import {
   Lock,
@@ -43,6 +45,8 @@ import {
   DataUsage as DataUsageIcon,
   History as HistoryIcon,
   Business as BusinessIcon,
+  Download as DownloadIcon,
+  Lock as LockIcon
 } from "@mui/icons-material";
 import AddModeratorIcon from "@mui/icons-material/AddModerator";
 
@@ -97,6 +101,12 @@ const SubjectPage = () => {
   const [filterTabs, setFilterTabs] = useState({});
   const [selectedDataForPolicy, setSelectedDataForPolicy] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+  const [protectAllDialogOpen, setProtectAllDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -464,9 +474,8 @@ const SubjectPage = () => {
                     if (entityPolicies.length === 1) {
                       policyDisplay = entityPolicies[0].groupName;
                     } else if (entityPolicies.length > 1) {
-                      policyDisplay = `${entityPolicies[0].groupName} (+${
-                        entityPolicies.length - 1
-                      })`;
+                      policyDisplay = `${entityPolicies[0].groupName} (+${entityPolicies.length - 1
+                        })`;
                     } else {
                       policyDisplay = "Protected";
                     }
@@ -611,6 +620,27 @@ const SubjectPage = () => {
     });
   };
 
+  const handleProtectAllSuccess = async (message, severity) => {
+    console.log("=== BULK ASSIGNMENT SUCCESS CALLBACK ===");
+    console.log("Message:", message);
+    console.log("Severity:", severity);
+
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+
+    // Small delay to ensure backend has completed
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Refresh policy status to update the UI
+    console.log("Refreshing policy status after bulk assignment...");
+    await fetchPolicyStatus();
+
+    console.log("Policy status refreshed");
+  };
+
   if (loading) {
     return <SkeletonSubjectLoading />;
   }
@@ -752,8 +782,8 @@ const SubjectPage = () => {
                         protectionPercentage >= 75
                           ? "success.main"
                           : protectionPercentage >= 50
-                          ? "warning.main"
-                          : "error.main",
+                            ? "warning.main"
+                            : "error.main",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -774,8 +804,8 @@ const SubjectPage = () => {
                         protectionPercentage >= 75
                           ? "success"
                           : protectionPercentage >= 50
-                          ? "warning"
-                          : "error"
+                            ? "warning"
+                            : "error"
                       }
                       sx={{ height: 6, borderRadius: 5 }}
                     />
@@ -793,7 +823,32 @@ const SubjectPage = () => {
                 />
 
                 {/* Right side - Action buttons */}
-                <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+                  {totalFields - protectedFields > 0 ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<LockIcon />}
+                      onClick={() => setProtectAllDialogOpen(true)}
+                      disabled={policyGroups.length === 0}
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
+                      Protect All Unprotected
+                    </Button>
+                  ) : (
+                    <Chip
+                      icon={<Security />}
+                      label="All Data Protected"
+                      color="success"
+                      variant="filled"
+                      sx={{
+                        height: 36,
+                        fontSize: "0.875rem",
+                        fontWeight: 500,
+                        px: 1,
+                      }}
+                    />
+                  )}
                   <DataExport
                     data={data}
                     user={user}
@@ -910,8 +965,8 @@ const SubjectPage = () => {
                                 sourceProtectionPercent >= 75
                                   ? "success"
                                   : sourceProtectionPercent >= 50
-                                  ? "warning"
-                                  : "error"
+                                    ? "warning"
+                                    : "error"
                               }
                               sx={{ height: 6, borderRadius: 5 }}
                             />
@@ -1010,29 +1065,29 @@ const SubjectPage = () => {
                 initialSelectedData={
                   selectedDataForPolicy?.type === "entity"
                     ? {
-                        entities: {
-                          [selectedDataForPolicy.source]: [
-                            selectedDataForPolicy.entityId,
-                          ],
-                        },
-                      }
+                      entities: {
+                        [selectedDataForPolicy.source]: [
+                          selectedDataForPolicy.entityId,
+                        ],
+                      },
+                    }
                     : selectedDataForPolicy?.type === "property"
-                    ? {
+                      ? {
                         properties: {
                           [selectedDataForPolicy.source]: [
                             selectedDataForPolicy.property,
                           ],
                         },
                       }
-                    : selectedDataForPolicy
-                    ? {
-                        properties: {
-                          [selectedDataForPolicy.source]: [
-                            selectedDataForPolicy.property,
-                          ],
-                        },
-                      }
-                    : undefined
+                      : selectedDataForPolicy
+                        ? {
+                          properties: {
+                            [selectedDataForPolicy.source]: [
+                              selectedDataForPolicy.property,
+                            ],
+                          },
+                        }
+                        : undefined
                 }
               />
             </DialogContent>
@@ -1044,6 +1099,18 @@ const SubjectPage = () => {
             onClose={() => setPolicyDetailsOpen(false)}
             details={selectedPolicyDetails}
           />
+
+          {/* Protect All Dialog */}
+          <ProtectAllDataDialog
+            open={protectAllDialogOpen}
+            onClose={() => setProtectAllDialogOpen(false)}
+            data={data}
+            policyGroups={policyGroups}
+            user={user}
+            isPropertyProtected={isPropertyProtected}
+            isEntityProtected={isEntityProtected}
+            onSuccess={handleProtectAllSuccess}
+          />
         </TabPanel>
 
         {/* Tab 2: Access History */}
@@ -1054,6 +1121,22 @@ const SubjectPage = () => {
           />
         </TabPanel>
       </Box>
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
