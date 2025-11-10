@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PolicyEvaluationService {
@@ -165,30 +166,76 @@ public class PolicyEvaluationService {
             );
         }
 
-        // 6. Policy exists and permits access - now find which policy group
-        PolicyGroupDTO applicablePolicy = findApplicablePolicyGroup(
+        // 6. Find ALL applicable policy groups for this data element
+        List<PolicyGroupDTO> applicablePolicies = findApplicablePolicyGroups(
                 subject.getId(),
                 dataSourceIdentifier,
                 schemaOrgProperty
         );
 
-        if (applicablePolicy == null) {
+        if (applicablePolicies.isEmpty()) {
             return createDenyDecision("Policy found but group details unavailable");
         }
 
-        // 7. Check constraints (purpose, expiration)
-        if (!checkConstraints(applicablePolicy, request)) {
-            return createDenyDecision("Policy constraints not satisfied (purpose/expiration)");
+        System.out.println("Found " + applicablePolicies.size() + " applicable policies for evaluation");
+
+        // 7. Evaluate ALL policies - collect denials and permits
+        List<String> denyReasons = new ArrayList<>();
+        List<PolicyGroupDTO> permitPolicies = new ArrayList<>();
+        List<ObligationDTO> allObligations = new ArrayList<>();
+
+        for (PolicyGroupDTO policy : applicablePolicies) {
+            System.out.println("Evaluating policy: " + policy.getName());
+
+            // Check if this specific policy permits the action
+            boolean policyPermitsAction = odrlService.checkPropertyAccess(
+                    subject.getId(),
+                    request.getControllerId(),
+                    dataSourceIdentifier,
+                    schemaOrgProperty,
+                    request.getAction()
+            );
+
+            if (!policyPermitsAction) {
+                String reason = "Policy '" + policy.getName() + "' does not permit action '" + request.getAction() + "'";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // Check constraints (purpose, expiration)
+            if (!checkConstraints(policy, request)) {
+                String reason = "Policy '" + policy.getName() + "' constraints not satisfied (purpose/expiration)";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // Check AI restrictions if applicable
+            if (!checkAiRestrictions(policy, request)) {
+                String reason = "Policy '" + policy.getName() + "' AI training restrictions not satisfied";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // This policy permits - collect obligations
+            System.out.println("  PERMIT: Policy '" + policy.getName() + "' allows access");
+            permitPolicies.add(policy);
+            allObligations.addAll(collectObligations(policy));
         }
 
-        // 8. Check AI restrictions if applicable
-        if (!checkAiRestrictions(applicablePolicy, request)) {
-            return createDenyDecision("AI training restrictions not satisfied");
+        // 8. Apply "most restrictive wins" logic
+        if (!denyReasons.isEmpty()) {
+            String combinedReason = "Access denied by " + denyReasons.size() + " policy/policies:\n" +
+                    String.join("\n", denyReasons);
+            System.out.println("FINAL DECISION: DENY (" + denyReasons.size() + " policies denied)");
+            return createDenyDecision(combinedReason);
         }
 
-        // 9. All checks passed - PERMIT with obligations
-        List<ObligationDTO> obligations = collectObligations(applicablePolicy);
-        return createPermitDecision(applicablePolicy, obligations);
+        // 9. All policies permit - return PERMIT with merged obligations
+        System.out.println("FINAL DECISION: PERMIT (all " + permitPolicies.size() + " policies allow access)");
+        return createPermitDecisionForMultiplePolicies(permitPolicies, allObligations);
     }
 
     /**
@@ -300,38 +347,85 @@ public class PolicyEvaluationService {
             );
         }
 
-        // 6. Policy exists and permits access - now find which policy group
-        PolicyGroupDTO applicablePolicy = findApplicablePolicyGroupForEntity(
+        // 6. Find ALL applicable policy groups for this entity
+        List<PolicyGroupDTO> applicablePolicies = findApplicablePolicyGroupsForEntity(
                 subject.getId(),
                 dataSourceIdentifier,
                 entityUri
         );
 
-        if (applicablePolicy == null) {
+        if (applicablePolicies.isEmpty()) {
             return createDenyDecision("Policy found but group details unavailable");
         }
 
-        // 7. Check constraints (purpose, expiration)
-        if (!checkConstraints(applicablePolicy, request)) {
-            return createDenyDecision("Policy constraints not satisfied (purpose/expiration)");
+        System.out.println("Found " + applicablePolicies.size() + " applicable policies for entity evaluation");
+
+        // 7. Evaluate ALL policies - collect denials and permits
+        List<String> denyReasons = new ArrayList<>();
+        List<PolicyGroupDTO> permitPolicies = new ArrayList<>();
+        List<ObligationDTO> allObligations = new ArrayList<>();
+
+        for (PolicyGroupDTO policy : applicablePolicies) {
+            System.out.println("Evaluating policy: " + policy.getName());
+
+            // Check if this specific policy permits the action
+            boolean policyPermitsAction = odrlService.checkEntityAccess(
+                    subject.getId(),
+                    request.getControllerId(),
+                    dataSourceIdentifier,
+                    entityUri,
+                    request.getAction()
+            );
+
+            if (!policyPermitsAction) {
+                String reason = "Policy '" + policy.getName() + "' does not permit action '" + request.getAction() + "'";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // Check constraints (purpose, expiration)
+            if (!checkConstraints(policy, request)) {
+                String reason = "Policy '" + policy.getName() + "' constraints not satisfied (purpose/expiration)";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // Check AI restrictions if applicable
+            if (!checkAiRestrictions(policy, request)) {
+                String reason = "Policy '" + policy.getName() + "' AI training restrictions not satisfied";
+                denyReasons.add(reason);
+                System.out.println("  DENY: " + reason);
+                continue;
+            }
+
+            // This policy permits - collect obligations
+            System.out.println("  PERMIT: Policy '" + policy.getName() + "' allows access");
+            permitPolicies.add(policy);
+            allObligations.addAll(collectObligations(policy));
         }
 
-        // 8. Check AI restrictions if applicable
-        if (!checkAiRestrictions(applicablePolicy, request)) {
-            return createDenyDecision("AI training restrictions not satisfied");
+        // 8. Apply "most restrictive wins" logic
+        if (!denyReasons.isEmpty()) {
+            String combinedReason = "Access denied by " + denyReasons.size() + " policy/policies:\n" +
+                    String.join("\n", denyReasons);
+            System.out.println("FINAL DECISION: DENY (" + denyReasons.size() + " policies denied)");
+            return createDenyDecision(combinedReason);
         }
 
-        // 9. All checks passed - PERMIT with obligations
-        List<ObligationDTO> obligations = collectObligations(applicablePolicy);
-        return createPermitDecision(applicablePolicy, obligations);
+        // 9. All policies permit - return PERMIT with merged obligations
+        System.out.println("FINAL DECISION: PERMIT (all " + permitPolicies.size() + " policies allow access)");
+        return createPermitDecisionForMultiplePolicies(permitPolicies, allObligations);
     }
 
     /**
-     * Find which policy group is assigned to this specific entity (entity-level)
+     * Find ALL policy groups assigned to this specific entity (entity-level)
      */
-    private PolicyGroupDTO findApplicablePolicyGroupForEntity(Long subjectId, String dataSource, String entityId) {
+    private List<PolicyGroupDTO> findApplicablePolicyGroupsForEntity(Long subjectId, String dataSource, String entityId) {
         // Get all policy groups for this subject
         List<PolicyGroupDTO> allGroups = policyGroupService.getPolicyGroupsBySubject(subjectId);
+        List<PolicyGroupDTO> applicableGroups = new ArrayList<>();
 
         // Check each group to see if it's assigned to the requested entity
         for (PolicyGroupDTO group : allGroups) {
@@ -346,19 +440,20 @@ public class PolicyEvaluationService {
             if (entityAssignments != null &&
                     entityAssignments.containsKey(dataSource) &&
                     entityAssignments.get(dataSource).contains(entityId)) {
-                return group;
+                applicableGroups.add(group);
             }
         }
 
-        return null;
+        return applicableGroups;
     }
 
     /**
-     * Find which policy group is assigned to this specific data element
+     * Find ALL policy groups assigned to this specific data element
      */
-    private PolicyGroupDTO findApplicablePolicyGroup(Long subjectId, String dataSource, String dataProperty) {
+    private List<PolicyGroupDTO> findApplicablePolicyGroups(Long subjectId, String dataSource, String dataProperty) {
         // Get all policy groups for this subject
         List<PolicyGroupDTO> allGroups = policyGroupService.getPolicyGroupsBySubject(subjectId);
+        List<PolicyGroupDTO> applicableGroups = new ArrayList<>();
 
         // Check each group to see if it's assigned to the requested data
         for (PolicyGroupDTO group : allGroups) {
@@ -373,11 +468,11 @@ public class PolicyEvaluationService {
             if (propertyAssignments != null &&
                     propertyAssignments.containsKey(dataSource) &&
                     propertyAssignments.get(dataSource).contains(dataProperty)) {
-                return group;
+                applicableGroups.add(group);
             }
         }
 
-        return null;
+        return applicableGroups;
     }
 
     /**
@@ -400,6 +495,29 @@ public class PolicyEvaluationService {
         decision.setReason("Access permitted by policy: " + policy.getName());
         decision.setPolicyGroupId(policy.getId());
         decision.setObligations(obligations);
+        return decision;
+    }
+
+    /**
+     * Creates a PERMIT decision for multiple policies with merged obligations
+     */
+    private PolicyDecisionDTO createPermitDecisionForMultiplePolicies(List<PolicyGroupDTO> policies, List<ObligationDTO> allObligations) {
+        PolicyDecisionDTO decision = new PolicyDecisionDTO();
+        decision.setResult(DecisionResult.PERMIT);
+
+        // Create a detailed reason showing all policies that permitted access
+        String policyNames = policies.stream()
+                .map(PolicyGroupDTO::getName)
+                .collect(Collectors.joining(", "));
+
+        decision.setReason("Access permitted by " + policies.size() + " policy/policies: " + policyNames);
+
+        // Set the first policy's ID for backward compatibility
+        if (!policies.isEmpty()) {
+            decision.setPolicyGroupId(policies.get(0).getId());
+        }
+
+        decision.setObligations(allObligations);
         return decision;
     }
 
