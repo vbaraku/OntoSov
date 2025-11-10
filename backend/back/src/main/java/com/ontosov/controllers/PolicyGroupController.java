@@ -124,6 +124,59 @@ public class PolicyGroupController {
         }
     }
 
+    /**
+     * Bulk assign policy to all unprotected data for a subject
+     * The frontend sends the list of unprotected items since it already has this info
+     */
+    @PostMapping("/{groupId}/assign-all-unprotected")
+    public ResponseEntity<?> assignAllUnprotectedData(
+            @PathVariable String groupId,
+            @RequestBody PolicyAssignmentDTO assignmentDTO,
+            @RequestParam Long subjectId) {
+
+        log.info("=== BULK ASSIGNMENT REQUEST RECEIVED ===");
+        log.info("Group ID: {}", groupId);
+        log.info("Subject ID: {}", subjectId);
+        log.info("Assignment DTO: {}", assignmentDTO);
+
+        try {
+            // Get the policy group details
+            List<PolicyGroupDTO> groups = policyGroupService.getPolicyGroupsBySubject(subjectId);
+            PolicyGroupDTO policyGroup = groups.stream()
+                    .filter(g -> g.getId().equals(groupId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Policy group not found"));
+
+            // Use existing assignment method
+            policyGroupService.assignDataToPolicy(groupId, assignmentDTO, policyGroup, subjectId);
+
+            // Calculate totals for response
+            int propertiesCount = assignmentDTO.getPropertyAssignments() != null
+                    ? assignmentDTO.getPropertyAssignments().values().stream().mapToInt(Set::size).sum()
+                    : 0;
+            int entitiesCount = assignmentDTO.getEntityAssignments() != null
+                    ? assignmentDTO.getEntityAssignments().values().stream().mapToInt(Set::size).sum()
+                    : 0;
+            int totalAssigned = propertiesCount + entitiesCount;
+
+            log.info("Successfully assigned {} items", totalAssigned);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Successfully protected " + totalAssigned + " unprotected data elements",
+                    "propertiesProtected", propertiesCount,
+                    "entitiesProtected", entitiesCount,
+                    "totalProtected", totalAssigned
+            ));
+
+        } catch (IllegalArgumentException e) {
+            log.error("Bad request in bulk assignment: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Internal error in bulk assignment: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{groupId}/assignments")
     public ResponseEntity<Map<String, Object>> getPolicyGroupAssignments(
             @PathVariable String groupId,

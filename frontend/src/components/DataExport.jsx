@@ -6,6 +6,8 @@ import {
   ListItemIcon,
   ListItemText,
   CircularProgress,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import {
   Download as DownloadIcon,
@@ -230,83 +232,83 @@ const DataExport = ({ data, user, policyStatus, policyGroups }) => {
           protectionPercentage:
             flattenedData.length > 0
               ? Math.round(
-                  (flattenedData.filter((item) => item.Protected === "Yes")
-                    .length /
-                    flattenedData.length) *
-                    100
-                )
+                (flattenedData.filter((item) => item.Protected === "Yes")
+                  .length /
+                  flattenedData.length) *
+                100
+              )
               : 0,
         },
         dataSources: dataBySource,
         policyGroups: policyGroups
           ? policyGroups.map((group) => {
-              // Get permissions (actions that are allowed)
-              const permissions = [];
-              const prohibitions = [];
+            // Get permissions (actions that are allowed)
+            const permissions = [];
+            const prohibitions = [];
 
-              if (group.permissions) {
-                Object.entries(group.permissions).forEach(
-                  ([action, isAllowed]) => {
-                    if (isAllowed) {
-                      permissions.push(
-                        action.charAt(0).toUpperCase() + action.slice(1)
-                      );
-                    }
+            if (group.permissions) {
+              Object.entries(group.permissions).forEach(
+                ([action, isAllowed]) => {
+                  if (isAllowed) {
+                    permissions.push(
+                      action.charAt(0).toUpperCase() + action.slice(1)
+                    );
                   }
-                );
-              }
+                }
+              );
+            }
 
-              // Get prohibitions (actions explicitly denied)
-              if (group.prohibitions) {
-                Object.entries(group.prohibitions).forEach(
-                  ([action, isDenied]) => {
-                    if (isDenied) {
-                      prohibitions.push(
-                        action.charAt(0).toUpperCase() + action.slice(1)
-                      );
-                    }
+            // Get prohibitions (actions explicitly denied)
+            if (group.prohibitions) {
+              Object.entries(group.prohibitions).forEach(
+                ([action, isDenied]) => {
+                  if (isDenied) {
+                    prohibitions.push(
+                      action.charAt(0).toUpperCase() + action.slice(1)
+                    );
                   }
-                );
-              }
+                }
+              );
+            }
 
-              return {
-                id: group.id,
-                name: group.name,
-                description: group.description || "No description",
-                permissions: permissions,
-                prohibitions: prohibitions,
-                constraints: {
-                  purpose: group.constraints?.purpose || "None specified",
-                  expiration: group.constraints?.expiration || "No expiration",
-                  requiresNotification:
-                    group.constraints?.requiresNotification || false,
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description || "No description",
+              permissions: permissions,
+              prohibitions: prohibitions,
+              constraints: {
+                purpose: group.constraints?.purpose || "None specified",
+                expiration: group.constraints?.expiration || "No expiration",
+                requiresNotification:
+                  group.constraints?.requiresNotification || false,
+              },
+              consequences: group.consequences
+                ? {
+                  notificationType:
+                    group.consequences.notificationType || "None",
+                  compensationAmount: group.consequences.compensationAmount
+                    ? `€${group.consequences.compensationAmount}`
+                    : "None",
+                }
+                : {
+                  notificationType: "None",
+                  compensationAmount: "None",
                 },
-                consequences: group.consequences
-                  ? {
-                      notificationType:
-                        group.consequences.notificationType || "None",
-                      compensationAmount: group.consequences.compensationAmount
-                        ? `€${group.consequences.compensationAmount}`
-                        : "None",
-                    }
-                  : {
-                      notificationType: "None",
-                      compensationAmount: "None",
-                    },
-                aiRestrictions: group.aiRestrictions
-                  ? {
-                      allowTraining:
-                        group.aiRestrictions.allowAiTraining !== false,
-                      algorithm:
-                        group.aiRestrictions.aiAlgorithm ||
-                        "No specific algorithm restriction",
-                    }
-                  : {
-                      allowTraining: true,
-                      algorithm: "No restrictions",
-                    },
-              };
-            })
+              aiRestrictions: group.aiRestrictions
+                ? {
+                  allowTraining:
+                    group.aiRestrictions.allowAiTraining !== false,
+                  algorithm:
+                    group.aiRestrictions.aiAlgorithm ||
+                    "No specific algorithm restriction",
+                }
+                : {
+                  allowTraining: true,
+                  algorithm: "No restrictions",
+                },
+            };
+          })
           : [],
       };
 
@@ -315,9 +317,8 @@ const DataExport = ({ data, user, policyStatus, policyGroups }) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `my-data-export-${
-        new Date().toISOString().split("T")[0]
-      }.json`;
+      link.download = `my-data-export-${new Date().toISOString().split("T")[0]
+        }.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -369,9 +370,8 @@ const DataExport = ({ data, user, policyStatus, policyGroups }) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `my-data-export-${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      link.download = `my-data-export-${new Date().toISOString().split("T")[0]
+        }.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -386,16 +386,18 @@ const DataExport = ({ data, user, policyStatus, policyGroups }) => {
 
   return (
     <>
-      <Button
-        variant="outlined"
-        startIcon={
-          exporting ? <CircularProgress size={20} /> : <DownloadIcon />
-        }
-        onClick={handleClick}
-        disabled={exporting || Object.keys(data).length === 0}
-      >
-        {exporting ? "Exporting..." : "Export My Data"}
-      </Button>
+      <Tooltip title="Export My Data">
+        <IconButton
+          onClick={handleClick}
+          color="primary"
+          sx={{
+            bgcolor: "primary.50",
+            "&:hover": { bgcolor: "primary.100" },
+          }}
+        >
+          <DownloadIcon />
+        </IconButton>
+      </Tooltip>
       <Menu
         anchorEl={anchorEl}
         open={open}
