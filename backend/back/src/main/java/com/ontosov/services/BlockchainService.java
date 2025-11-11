@@ -13,6 +13,8 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthCall;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
+import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.TransactionManager;
@@ -29,6 +31,27 @@ import java.util.List;
 
 @Service
 public class BlockchainService {
+
+    /**
+     * Result class for blockchain logging operations
+     */
+    public static class BlockchainLogResult {
+        private final String transactionHash;
+        private final Long logIndex;
+
+        public BlockchainLogResult(String transactionHash, Long logIndex) {
+            this.transactionHash = transactionHash;
+            this.logIndex = logIndex;
+        }
+
+        public String getTransactionHash() {
+            return transactionHash;
+        }
+
+        public Long getLogIndex() {
+            return logIndex;
+        }
+    }
 
     private Web3j web3j;
     private Credentials credentials;
@@ -99,7 +122,7 @@ public class BlockchainService {
     /**
      * Log an access attempt on the blockchain
      */
-    public String logAccess(
+    public BlockchainLogResult logAccess(
             String controllerAddress,
             String subjectAddress,
             String purpose,
@@ -142,14 +165,39 @@ public class BlockchainService {
 
             String txHash = transactionResponse.getTransactionHash();
 
+            // Wait for transaction receipt to get the log index
+            Long logIndex = null;
+            try {
+                TransactionReceipt receipt = web3j.ethGetTransactionReceipt(txHash)
+                        .send()
+                        .getTransactionReceipt()
+                        .orElse(null);
+
+                if (receipt != null && receipt.getLogs() != null && !receipt.getLogs().isEmpty()) {
+                    // Parse the AccessLogged event to extract logIndex
+                    // The logIndex is the first indexed parameter (topics[1])
+                    for (Log log : receipt.getLogs()) {
+                        if (log.getTopics() != null && log.getTopics().size() >= 2) {
+                            // Extract logIndex from topics[1]
+                            String logIndexHex = log.getTopics().get(1);
+                            logIndex = new BigInteger(logIndexHex.substring(2), 16).longValue();
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to extract log index: " + e.getMessage());
+            }
+
             System.out.println("Access logged on blockchain:");
             System.out.println("  Controller: " + controllerAddress);
             System.out.println("  Subject: " + subjectAddress);
             System.out.println("  Action: " + action);
             System.out.println("  Permitted: " + permitted);
             System.out.println("  Transaction: " + txHash);
+            System.out.println("  Log Index: " + logIndex);
 
-            return txHash;
+            return new BlockchainLogResult(txHash, logIndex);
 
         } catch (Exception e) {
             System.err.println("Error logging access: " + e.getMessage());
