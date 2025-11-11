@@ -51,7 +51,7 @@ public class ControllerAccessController {
                 String controllerAddress = "0x" + String.format("%040x", request.getControllerId());
                 String subjectAddress = "0x" + String.format("%040x", savedLog.getSubjectId());
 
-                String txHash = blockchainService.logAccess(
+                BlockchainService.BlockchainLogResult result = blockchainService.logAccess(
                         controllerAddress,
                         subjectAddress,
                         request.getPurpose() != null ? request.getPurpose() : "",
@@ -61,10 +61,12 @@ public class ControllerAccessController {
                         decision.getPolicyVersion() != null ? java.math.BigInteger.valueOf(decision.getPolicyVersion()) : java.math.BigInteger.ZERO
                 );
 
-                if (txHash != null) {
-                    savedLog.setBlockchainTxHash(txHash);
+                if (result != null && result.getTransactionHash() != null) {
+                    savedLog.setBlockchainTxHash(result.getTransactionHash());
+                    savedLog.setBlockchainLogIndex(result.getLogIndex());
                     accessLogRepo.save(savedLog);
-                    System.out.println("Access logged to blockchain. TX: " + txHash);
+                    System.out.println("Access logged to blockchain. TX: " + result.getTransactionHash() +
+                                     ", Log Index: " + result.getLogIndex());
                 }
             } catch (Exception e) {
                 System.err.println("Warning: Failed to log to blockchain: " + e.getMessage());
