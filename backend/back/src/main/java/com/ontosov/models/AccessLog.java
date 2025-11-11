@@ -36,4 +36,7 @@ public class AccessLog {
 
     private LocalDateTime requestTime;
     private String blockchainTxHash;
+
+    @Column(name = "blockchain_log_index")
+    private Long blockchainLogIndex;
 }

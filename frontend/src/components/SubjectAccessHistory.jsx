@@ -37,7 +37,12 @@ import {
   Visibility as VisibilityIcon,
   Warning as WarningIcon,
   Shield as ShieldIcon,
+  ExpandMore as ExpandMoreIcon,
+  Error as ErrorIcon,
+  Sync as SyncIcon,
 } from "@mui/icons-material";
+import { verifySingleLog, verifyBatchLogs, checkBlockchainConnection } from '../services/blockchainVerification';
+import { Collapse } from '@mui/material';
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
@@ -69,10 +74,15 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
   const [filterAction, setFilterAction] = useState("all");
   const [selectedLog, setSelectedLog] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState({});
+  const [batchVerifying, setBatchVerifying] = useState(false);
+  const [blockchainStatus, setBlockchainStatus] = useState(null);
+  const [expandedDetails, setExpandedDetails] = useState({});
 
   useEffect(() => {
     if (subjectId) {
       fetchAccessLogs();
+      checkBlockchainConnection().then(setBlockchainStatus);
     }
   }, [subjectId]);
 
@@ -119,6 +129,29 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const handleVerifySingle = async (log) => {
+    setVerificationStatus(prev => ({ ...prev, [log.id]: { loading: true } }));
+    const result = await verifySingleLog(log);
+    setVerificationStatus(prev => ({ ...prev, [log.id]: { loading: false, ...result } }));
+  };
+
+  const handleVerifyAll = async () => {
+    setBatchVerifying(true);
+    const results = await verifyBatchLogs(accessLogs.filter(l => l.blockchainLogIndex !== null && l.blockchainLogIndex !== undefined));
+    const newStatus = {};
+    results.details.forEach(r => { newStatus[r.logId] = { loading: false, verified: r.verified, error: r.error, details: r.details }; });
+    setVerificationStatus(newStatus);
+    setBatchVerifying(false);
+  };
+
+  const getVerificationBadge = (log) => {
+    const status = verificationStatus[log.id];
+    if (!status) return <Chip size="small" label="Not Verified" variant="outlined" />;
+    if (status.loading) return <Chip size="small" icon={<CircularProgress size={16} />} label="Verifying..." color="info" />;
+    if (status.verified) return <Chip size="small" icon={<CheckCircleIcon />} label="Verified" color="success" />;
+    return <Chip size="small" icon={<ErrorIcon />} label="Did not match" color="error" />;
   };
 
   // Calculate statistics
@@ -244,6 +277,33 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
         </Typography>
       </Alert>
 
+      {/* Blockchain Connection Status */}
+      {blockchainStatus && (
+        <Alert
+          severity={blockchainStatus.connected ? "success" : "warning"}
+          sx={{ mb: 3 }}
+          action={
+            blockchainStatus.connected && (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={handleVerifyAll}
+                disabled={batchVerifying || accessLogs.filter(l => l.blockchainLogIndex !== null).length === 0}
+                startIcon={batchVerifying ? <CircularProgress size={16} /> : <SyncIcon />}
+              >
+                {batchVerifying ? "Verifying..." : "Verify All"}
+              </Button>
+            )
+          }
+        >
+          <Typography variant="body2">
+            {blockchainStatus.connected
+              ? "Connected to blockchain. You can verify access logs directly from your browser."
+              : `Cannot connect to blockchain: ${blockchainStatus.error || "Unknown error"}`}
+          </Typography>
+        </Alert>
+      )}
+
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -303,13 +363,14 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
               <StyledTableCell>Data Requested</StyledTableCell>
               <StyledTableCell>Decision</StyledTableCell>
               <StyledTableCell>Blockchain TX</StyledTableCell>
+              <StyledTableCell>Verification</StyledTableCell>
               <StyledTableCell align="center">Details</StyledTableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredLogs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                     No access logs found
                   </Typography>
@@ -381,6 +442,23 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                     ) : (
                       "N/A"
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {getVerificationBadge(log)}
+                      {log.blockchainLogIndex !== null && log.blockchainLogIndex !== undefined && blockchainStatus?.connected && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleVerifySingle(log);
+                          }}
+                          disabled={verificationStatus[log.id]?.loading}
+                        >
+                          <SyncIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Stack>
                   </TableCell>
                   <TableCell align="center">
                     <IconButton size="small">
@@ -541,6 +619,60 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                       This access attempt is permanently recorded on the blockchain
                       for verification and audit purposes.
                     </Typography>
+                  </Grid>
+                )}
+                {selectedLog.blockchainLogIndex !== null && selectedLog.blockchainLogIndex !== undefined && verificationStatus[selectedLog.id] && (
+                  <Grid item xs={12}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            Blockchain Verification
+                          </Typography>
+                          {verificationStatus[selectedLog.id].verified ? (
+                            <Chip icon={<CheckCircleIcon />} label="Verified" color="success" size="small" />
+                          ) : (
+                            <Chip icon={<ErrorIcon />} label="Did not match" color="error" size="small" />
+                          )}
+                        </Stack>
+                        {verificationStatus[selectedLog.id].error ? (
+                          <Alert severity="error">
+                            {verificationStatus[selectedLog.id].error}
+                          </Alert>
+                        ) : verificationStatus[selectedLog.id].details ? (
+                          <>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                              <Typography variant="caption">
+                                Your browser queried the blockchain directly (no server involved) to verify this record.
+                                Log Index: {verificationStatus[selectedLog.id].details.logIndex}
+                              </Typography>
+                            </Alert>
+                            <Stack spacing={1}>
+                              {Object.entries(verificationStatus[selectedLog.id].details.comparison).map(([field, data]) => (
+                                <Paper key={field} variant="outlined" sx={{ p: 1.5 }}>
+                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                    {data.match ? (
+                                      <CheckCircleIcon color="success" fontSize="small" />
+                                    ) : (
+                                      <CancelIcon color="error" fontSize="small" />
+                                    )}
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                                    </Typography>
+                                  </Stack>
+                                  <Typography variant="caption" display="block" color="text.secondary">
+                                    System: {typeof data.system === 'boolean' ? data.system.toString() : data.system}
+                                  </Typography>
+                                  <Typography variant="caption" display="block" color="text.secondary">
+                                    Blockchain: {typeof data.blockchain === 'boolean' ? data.blockchain.toString() : data.blockchain}
+                                  </Typography>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          </>
+                        ) : null}
+                      </CardContent>
+                    </Card>
                   </Grid>
                 )}
               </Grid>
