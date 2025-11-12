@@ -120,20 +120,37 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
     return controller?.name || `Controller ${controllerId}`;
   };
 
-  const filteredLogs = accessLogs.filter((log) => {
-    const controllerName = getControllerName(log.controllerId);
-    const matchesSearch =
-      controllerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.dataDescription?.toLowerCase().includes(searchTerm.toLowerCase());
+  const formatDataRequested = (log) => {
+    // Priority: 1) Property-level access, 2) Entity-level access, 3) Description, 4) N/A
+    if (log.dataProperty && log.tableName) {
+      return `${log.tableName}.${log.dataProperty}`;
+    } else if (log.recordId && log.tableName) {
+      return `${log.tableName} (record ID: ${log.recordId})`;
+    } else if (log.tableName) {
+      return log.tableName;
+    } else if (log.dataDescription) {
+      return log.dataDescription;
+    }
+    return "N/A";
+  };
 
-    const matchesDecision =
-      filterDecision === "all" || log.decision === filterDecision;
+  const filteredLogs = accessLogs
+    .filter((log) => {
+      const controllerName = getControllerName(log.controllerId);
+      const dataRequested = formatDataRequested(log);
+      const matchesSearch =
+        controllerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dataRequested.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesAction = filterAction === "all" || log.action === filterAction;
+      const matchesDecision =
+        filterDecision === "all" || log.decision === filterDecision;
 
-    return matchesSearch && matchesDecision && matchesAction;
-  });
+      const matchesAction = filterAction === "all" || log.action === filterAction;
+
+      return matchesSearch && matchesDecision && matchesAction;
+    })
+    .sort((a, b) => new Date(b.requestTime) - new Date(a.requestTime));
 
   const handleRowClick = (log) => {
     setSelectedLog(log);
@@ -224,15 +241,15 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
+      {/* <Typography variant="h5" color="text.primary" gutterBottom>
         Who Accessed My Data
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Transparency log of all access attempts to your data. Both permitted and
         denied requests are recorded on the blockchain.
-      </Typography>
+      </Typography> */}
 
-      {/* Alert for recent denials */}
+      {/* Alert for recent denials
       {deniedRecent > 0 && (
         <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 3 }}>
           <Typography variant="body2">
@@ -241,7 +258,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             are protecting your data.
           </Typography>
         </Alert>
-      )}
+      )} */}
 
       {/* Statistics Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -456,9 +473,9 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                     </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title={log.dataDescription || ""}>
+                    <Tooltip title={formatDataRequested(log)}>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                        {log.dataDescription || "N/A"}
+                        {formatDataRequested(log)}
                       </Typography>
                     </Tooltip>
                   </TableCell>
@@ -594,7 +611,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                     Data Requested
                   </Typography>
                   <Typography variant="body1">
-                    {selectedLog.dataDescription || "N/A"}
+                    {formatDataRequested(selectedLog)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12}>

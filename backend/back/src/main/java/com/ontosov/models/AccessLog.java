@@ -25,7 +25,9 @@ public class AccessLog {
     private String purpose;
     private String dataDescription;
     private String dataSource;
+    private String tableName;
     private String dataProperty;
+    private String recordId;
 
     @Enumerated(EnumType.STRING)
     private DecisionResult decision;
