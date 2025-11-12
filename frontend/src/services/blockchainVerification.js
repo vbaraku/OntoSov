@@ -2,10 +2,57 @@ import { getWeb3Instance, getAccessLoggerContract } from '../utils/web3Config';
 
 const idToAddress = (id) => '0x' + id.toString(16).padStart(40, '0');
 
-export const verifySingleLog = async (log) => {
+// LocalStorage cache key prefix
+const CACHE_KEY_PREFIX = 'bv-';
+
+// Save verification result to localStorage
+const saveVerificationToCache = (txHash, logIndex, result) => {
+  try {
+    const cacheKey = `${CACHE_KEY_PREFIX}${txHash}-${logIndex}`;
+    const cacheValue = {
+      v: result.verified,
+      t: Math.floor(Date.now() / 1000), // timestamp in seconds
+      e: result.error || null,
+      d: result.details || null
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheValue));
+  } catch (error) {
+    console.warn('Failed to cache verification result:', error);
+  }
+};
+
+// Load verification result from localStorage
+const loadVerificationFromCache = (txHash, logIndex) => {
+  try {
+    const cacheKey = `${CACHE_KEY_PREFIX}${txHash}-${logIndex}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return {
+        verified: parsed.v,
+        error: parsed.e,
+        details: parsed.d,
+        timestamp: parsed.t * 1000 // convert back to milliseconds
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to load cached verification:', error);
+  }
+  return null;
+};
+
+export const verifySingleLog = async (log, skipCache = false) => {
   try {
     if (log.blockchainLogIndex === null || log.blockchainLogIndex === undefined) {
       return { verified: false, error: 'No blockchain log index', details: null };
+    }
+
+    // Check cache first unless skipCache is true
+    if (!skipCache && log.blockchainTxHash) {
+      const cached = loadVerificationFromCache(log.blockchainTxHash, log.blockchainLogIndex);
+      if (cached) {
+        return cached;
+      }
     }
 
     const web3 = getWeb3Instance();
@@ -54,13 +101,25 @@ export const verifySingleLog = async (log) => {
 
     const allMatch = Object.values(comparison).every(field => field.match);
 
-    return {
+    const result = {
       verified: allMatch,
       error: null,
       details: { comparison, logIndex: log.blockchainLogIndex }
     };
+
+    // Save to cache
+    if (log.blockchainTxHash) {
+      saveVerificationToCache(log.blockchainTxHash, log.blockchainLogIndex, result);
+    }
+
+    return result;
   } catch (error) {
-    return { verified: false, error: error.message, details: null };
+    const result = { verified: false, error: error.message, details: null };
+    // Cache errors too (to avoid repeatedly querying failed verifications)
+    if (log.blockchainTxHash) {
+      saveVerificationToCache(log.blockchainTxHash, log.blockchainLogIndex, result);
+    }
+    return result;
   }
 };
 
@@ -85,3 +144,6 @@ export const checkBlockchainConnection = async () => {
     return { connected: false, error: error.message };
   }
 };
+
+// Export for loading cached verifications on component mount
+export const loadCachedVerification = loadVerificationFromCache;
