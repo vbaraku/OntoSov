@@ -134,21 +134,23 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
     return "N/A";
   };
 
-  const filteredLogs = accessLogs.filter((log) => {
-    const controllerName = getControllerName(log.controllerId);
-    const dataRequested = formatDataRequested(log);
-    const matchesSearch =
-      controllerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dataRequested.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredLogs = accessLogs
+    .filter((log) => {
+      const controllerName = getControllerName(log.controllerId);
+      const dataRequested = formatDataRequested(log);
+      const matchesSearch =
+        controllerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dataRequested.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesDecision =
-      filterDecision === "all" || log.decision === filterDecision;
+      const matchesDecision =
+        filterDecision === "all" || log.decision === filterDecision;
 
-    const matchesAction = filterAction === "all" || log.action === filterAction;
+      const matchesAction = filterAction === "all" || log.action === filterAction;
 
-    return matchesSearch && matchesDecision && matchesAction;
-  });
+      return matchesSearch && matchesDecision && matchesAction;
+    })
+    .sort((a, b) => new Date(b.requestTime) - new Date(a.requestTime));
 
   const handleRowClick = (log) => {
     setSelectedLog(log);
@@ -239,15 +241,15 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
+      {/* <Typography variant="h5" color="text.primary" gutterBottom>
         Who Accessed My Data
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Transparency log of all access attempts to your data. Both permitted and
         denied requests are recorded on the blockchain.
-      </Typography>
+      </Typography> */}
 
-      {/* Alert for recent denials */}
+      {/* Alert for recent denials
       {deniedRecent > 0 && (
         <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 3 }}>
           <Typography variant="body2">
@@ -256,7 +258,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             are protecting your data.
           </Typography>
         </Alert>
-      )}
+      )} */}
 
       {/* Statistics Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
