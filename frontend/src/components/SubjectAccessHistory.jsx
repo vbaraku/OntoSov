@@ -342,20 +342,15 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             )
           }
         >
-          <Typography variant="body2" sx={{ mb: 0.5 }}>
+          <Typography variant="body2">
             {blockchainStatus.connected ? (
               <>
-                <strong>Independent Verification Available:</strong> Your browser can directly query the blockchain to verify that the access logs shown here match the immutable records on the blockchain - no need to trust this system.
+                <strong>Independent Verification:</strong> Your browser will query the blockchain to verify that the access logs shown here match the immutable records on the blockchain.
               </>
             ) : (
               `Cannot connect to blockchain: ${blockchainStatus.error || "Unknown error"}`
             )}
           </Typography>
-          {blockchainStatus.connected && (
-            <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-              What's verified: Controller identity, your identity (subject), what action was requested, whether it was permitted, and which policy was applied. This ensures the system cannot hide or modify access attempts.
-            </Typography>
-          )}
         </Alert>
       )}
 
@@ -701,7 +696,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                                 True Transparency
                               </Typography>
                               <Typography variant="caption" display="block">
-                                Your browser directly queried the blockchain (bypassing this system entirely) and compared the immutable blockchain record with what's shown above. This proves the system cannot tamper with, hide, or fabricate access logs.
+                                Your browser directly queried the blockchain (bypassing this system entirely) and compared the immutable blockchain record with what's shown above. This proves the system did not tamper with, hide, or fabricate access logs.
                               </Typography>
                               <Typography variant="caption" display="block" sx={{ mt: 1 }}>
                                 <strong>Blockchain Log Index:</strong> {verificationStatus[selectedLog.id].details.logIndex}
