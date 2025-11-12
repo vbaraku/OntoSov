@@ -85,8 +85,8 @@ npm run dev  # Runs on http://localhost:5173
 ```bash
 cd blockchain
 npm install
-ganache  # Start local blockchain
-npx hardhat run scripts/deploy.js --network localhost
+npx hardhat node
+npx hardhat ignition deploy ./ignition/modules/Contracts.ts --network localhost
 ```
 
 ### Configuration
