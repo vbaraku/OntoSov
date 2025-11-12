@@ -78,8 +78,9 @@ export const verifyBatchLogs = async (logs) => {
 export const checkBlockchainConnection = async () => {
   try {
     const web3 = getWeb3Instance();
-    const isConnected = await web3.eth.net.isListening();
-    return isConnected ? { connected: true } : { connected: false, error: 'Cannot reach node' };
+    // Use eth_blockNumber instead of net_listening (Hardhat compatible)
+    await web3.eth.getBlockNumber();
+    return { connected: true };
   } catch (error) {
     return { connected: false, error: error.message };
   }
