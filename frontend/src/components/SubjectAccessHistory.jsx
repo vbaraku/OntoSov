@@ -120,12 +120,27 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
     return controller?.name || `Controller ${controllerId}`;
   };
 
+  const formatDataRequested = (log) => {
+    // Priority: 1) Property-level access, 2) Entity-level access, 3) Description, 4) N/A
+    if (log.dataProperty && log.tableName) {
+      return `${log.tableName}.${log.dataProperty}`;
+    } else if (log.recordId && log.tableName) {
+      return `${log.tableName} (record ID: ${log.recordId})`;
+    } else if (log.tableName) {
+      return log.tableName;
+    } else if (log.dataDescription) {
+      return log.dataDescription;
+    }
+    return "N/A";
+  };
+
   const filteredLogs = accessLogs.filter((log) => {
     const controllerName = getControllerName(log.controllerId);
+    const dataRequested = formatDataRequested(log);
     const matchesSearch =
       controllerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.dataDescription?.toLowerCase().includes(searchTerm.toLowerCase());
+      dataRequested.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDecision =
       filterDecision === "all" || log.decision === filterDecision;
@@ -456,9 +471,9 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                     </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title={log.dataDescription || ""}>
+                    <Tooltip title={formatDataRequested(log)}>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
-                        {log.dataDescription || "N/A"}
+                        {formatDataRequested(log)}
                       </Typography>
                     </Tooltip>
                   </TableCell>
@@ -594,7 +609,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                     Data Requested
                   </Typography>
                   <Typography variant="body1">
-                    {selectedLog.dataDescription || "N/A"}
+                    {formatDataRequested(selectedLog)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12}>

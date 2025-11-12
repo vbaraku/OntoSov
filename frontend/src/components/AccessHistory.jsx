@@ -104,10 +104,25 @@ const AccessHistory = ({ controllerId }) => {
     }
   };
 
+  const formatDataRequested = (log) => {
+    // Priority: 1) Property-level access, 2) Entity-level access, 3) Description, 4) N/A
+    if (log.dataProperty && log.tableName) {
+      return `${log.tableName}.${log.dataProperty}`;
+    } else if (log.recordId && log.tableName) {
+      return `${log.tableName} (record ID: ${log.recordId})`;
+    } else if (log.tableName) {
+      return log.tableName;
+    } else if (log.dataDescription) {
+      return log.dataDescription;
+    }
+    return "N/A";
+  };
+
   const filteredLogs = accessLogs.filter((log) => {
+    const dataRequested = formatDataRequested(log);
     const matchesSearch =
       log.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.dataDescription?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dataRequested.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.subjectId?.toString().includes(searchTerm);
 
     const matchesDecision =
@@ -412,10 +427,10 @@ const AccessHistory = ({ controllerId }) => {
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Data Description
+                    Data Requested
                   </Typography>
                   <Typography variant="body1">
-                    {selectedLog.dataDescription || "N/A"}
+                    {formatDataRequested(selectedLog)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12}>

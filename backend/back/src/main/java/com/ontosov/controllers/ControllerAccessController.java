@@ -157,7 +157,9 @@ public class ControllerAccessController {
         log.setDataDescription(request.getDataDescription());
         log.setRequestTime(LocalDateTime.now());
         log.setDataSource(request.getDataSource());
+        log.setTableName(request.getTableName());
         log.setDataProperty(request.getDataProperty());
+        log.setRecordId(request.getRecordId());
 
         // Find and set subject ID
         User subject = userRepo.findByTaxid(request.getSubjectTaxId());
