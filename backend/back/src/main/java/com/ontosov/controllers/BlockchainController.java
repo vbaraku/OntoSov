@@ -40,7 +40,7 @@ public class BlockchainController {
         String controller = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
         String subject = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 
-        String txHash = blockchainService.logAccess(
+        BlockchainService.BlockchainLogResult result = blockchainService.logAccess(
                 controller,
                 subject,
                 "Testing Purpose",
@@ -50,8 +50,9 @@ public class BlockchainController {
                 BigInteger.ONE
         );
 
-        if (txHash != null) {
-            return ResponseEntity.ok("Access logged! TX: " + txHash);
+        if (result != null && result.getTransactionHash() != null) {
+            return ResponseEntity.ok("Access logged! TX: " + result.getTransactionHash() +
+                                   ", Log Index: " + result.getLogIndex());
         } else {
             return ResponseEntity.internalServerError().body("Failed to log access");
         }
