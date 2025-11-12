@@ -41,7 +41,7 @@ import {
   Error as ErrorIcon,
   Sync as SyncIcon,
 } from "@mui/icons-material";
-import { verifySingleLog, verifyBatchLogs, checkBlockchainConnection } from '../services/blockchainVerification';
+import { verifySingleLog, verifyBatchLogs, checkBlockchainConnection, loadCachedVerification } from '../services/blockchainVerification';
 import { Collapse } from '@mui/material';
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -94,6 +94,19 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
       if (!response.ok) throw new Error("Failed to fetch access logs");
       const data = await response.json();
       setAccessLogs(data);
+
+      // Load cached verifications
+      const cachedStatus = {};
+      data.forEach(log => {
+        if (log.blockchainTxHash && log.blockchainLogIndex !== null && log.blockchainLogIndex !== undefined) {
+          const cached = loadCachedVerification(log.blockchainTxHash, log.blockchainLogIndex);
+          if (cached) {
+            cachedStatus[log.id] = { loading: false, ...cached };
+          }
+        }
+      });
+      setVerificationStatus(cachedStatus);
+
       setLoading(false);
     } catch (err) {
       console.error("Error fetching access logs:", err);
@@ -139,9 +152,23 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
 
   const handleVerifyAll = async () => {
     setBatchVerifying(true);
-    const results = await verifyBatchLogs(accessLogs.filter(l => l.blockchainLogIndex !== null && l.blockchainLogIndex !== undefined));
-    const newStatus = {};
-    results.details.forEach(r => { newStatus[r.logId] = { loading: false, verified: r.verified, error: r.error, details: r.details }; });
+    // Only verify logs that haven't been verified yet
+    const logsToVerify = accessLogs.filter(l =>
+      l.blockchainLogIndex !== null &&
+      l.blockchainLogIndex !== undefined &&
+      !verificationStatus[l.id] // Skip logs already verified
+    );
+
+    if (logsToVerify.length === 0) {
+      setBatchVerifying(false);
+      return;
+    }
+
+    const results = await verifyBatchLogs(logsToVerify);
+    const newStatus = { ...verificationStatus }; // Keep existing verifications
+    results.details.forEach(r => {
+      newStatus[r.logId] = { loading: false, verified: r.verified, error: r.error, details: r.details };
+    });
     setVerificationStatus(newStatus);
     setBatchVerifying(false);
   };
@@ -150,7 +177,26 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
     const status = verificationStatus[log.id];
     if (!status) return <Chip size="small" label="Not Verified" variant="outlined" />;
     if (status.loading) return <Chip size="small" icon={<CircularProgress size={16} />} label="Verifying..." color="info" />;
-    if (status.verified) return <Chip size="small" icon={<CheckCircleIcon />} label="Verified" color="success" />;
+
+    const getTimeAgo = (timestamp) => {
+      const seconds = Math.floor((Date.now() - timestamp) / 1000);
+      if (seconds < 60) return 'just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+      return `${Math.floor(seconds / 86400)} days ago`;
+    };
+
+    const tooltipText = status.timestamp
+      ? `Verified ${getTimeAgo(status.timestamp)}. Click sync to re-verify.`
+      : 'Verified. Click sync to re-verify.';
+
+    if (status.verified) {
+      return (
+        <Tooltip title={tooltipText}>
+          <Chip size="small" icon={<CheckCircleIcon />} label="Verified" color="success" />
+        </Tooltip>
+      );
+    }
     return <Chip size="small" icon={<ErrorIcon />} label="Did not match" color="error" />;
   };
 
@@ -288,7 +334,7 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                 color="inherit"
                 size="small"
                 onClick={handleVerifyAll}
-                disabled={batchVerifying || accessLogs.filter(l => l.blockchainLogIndex !== null).length === 0}
+                disabled={batchVerifying || accessLogs.filter(l => l.blockchainLogIndex !== null && !verificationStatus[l.id]).length === 0}
                 startIcon={batchVerifying ? <CircularProgress size={16} /> : <SyncIcon />}
               >
                 {batchVerifying ? "Verifying..." : "Verify All"}
@@ -296,11 +342,20 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             )
           }
         >
-          <Typography variant="body2">
-            {blockchainStatus.connected
-              ? "Connected to blockchain. You can verify access logs directly from your browser."
-              : `Cannot connect to blockchain: ${blockchainStatus.error || "Unknown error"}`}
+          <Typography variant="body2" sx={{ mb: 0.5 }}>
+            {blockchainStatus.connected ? (
+              <>
+                <strong>Independent Verification Available:</strong> Your browser can directly query the blockchain to verify that the access logs shown here match the immutable records on the blockchain - no need to trust this system.
+              </>
+            ) : (
+              `Cannot connect to blockchain: ${blockchainStatus.error || "Unknown error"}`
+            )}
           </Typography>
+          {blockchainStatus.connected && (
+            <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+              What's verified: Controller identity, your identity (subject), what action was requested, whether it was permitted, and which policy was applied. This ensures the system cannot hide or modify access attempts.
+            </Typography>
+          )}
         </Alert>
       )}
 
@@ -627,12 +682,12 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                       <CardContent>
                         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
                           <Typography variant="subtitle1" fontWeight="bold">
-                            Blockchain Verification
+                            Independent Blockchain Verification
                           </Typography>
                           {verificationStatus[selectedLog.id].verified ? (
                             <Chip icon={<CheckCircleIcon />} label="Verified" color="success" size="small" />
                           ) : (
-                            <Chip icon={<ErrorIcon />} label="Did not match" color="error" size="small" />
+                            <Chip icon={<ErrorIcon />} label="Mismatch Detected" color="error" size="small" />
                           )}
                         </Stack>
                         {verificationStatus[selectedLog.id].error ? (
@@ -642,33 +697,80 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                         ) : verificationStatus[selectedLog.id].details ? (
                           <>
                             <Alert severity="info" sx={{ mb: 2 }}>
-                              <Typography variant="caption">
-                                Your browser queried the blockchain directly (no server involved) to verify this record.
-                                Log Index: {verificationStatus[selectedLog.id].details.logIndex}
+                              <Typography variant="body2" fontWeight="bold" gutterBottom>
+                                True Transparency
+                              </Typography>
+                              <Typography variant="caption" display="block">
+                                Your browser directly queried the blockchain (bypassing this system entirely) and compared the immutable blockchain record with what's shown above. This proves the system cannot tamper with, hide, or fabricate access logs.
+                              </Typography>
+                              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                                <strong>Blockchain Log Index:</strong> {verificationStatus[selectedLog.id].details.logIndex}
                               </Typography>
                             </Alert>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Verification Results:
+                            </Typography>
                             <Stack spacing={1}>
-                              {Object.entries(verificationStatus[selectedLog.id].details.comparison).map(([field, data]) => (
-                                <Paper key={field} variant="outlined" sx={{ p: 1.5 }}>
-                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                                    {data.match ? (
-                                      <CheckCircleIcon color="success" fontSize="small" />
-                                    ) : (
-                                      <CancelIcon color="error" fontSize="small" />
-                                    )}
-                                    <Typography variant="subtitle2" fontWeight="bold">
-                                      {field.charAt(0).toUpperCase() + field.slice(1)}
+                              {(() => {
+                                const fieldLabels = {
+                                  controller: {
+                                    title: 'Controller Identity',
+                                    description: 'Who requested access to your data'
+                                  },
+                                  subject: {
+                                    title: 'Your Identity (Subject)',
+                                    description: 'Confirms this log is about you'
+                                  },
+                                  action: {
+                                    title: 'Action Requested',
+                                    description: 'What they wanted to do with your data'
+                                  },
+                                  permitted: {
+                                    title: 'Access Decision',
+                                    description: 'Whether the request was allowed or denied'
+                                  },
+                                  policyGroupId: {
+                                    title: 'Policy Applied',
+                                    description: 'Which policy governed this decision'
+                                  }
+                                };
+
+                                return Object.entries(verificationStatus[selectedLog.id].details.comparison).map(([field, data]) => (
+                                  <Paper key={field} variant="outlined" sx={{ p: 1.5, bgcolor: data.match ? 'success.50' : 'error.50' }}>
+                                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                      {data.match ? (
+                                        <CheckCircleIcon color="success" fontSize="small" />
+                                      ) : (
+                                        <CancelIcon color="error" fontSize="small" />
+                                      )}
+                                      <Typography variant="subtitle2" fontWeight="bold">
+                                        {fieldLabels[field]?.title || field}
+                                      </Typography>
+                                    </Stack>
+                                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.5 }}>
+                                      {fieldLabels[field]?.description}
                                     </Typography>
-                                  </Stack>
-                                  <Typography variant="caption" display="block" color="text.secondary">
-                                    System: {typeof data.system === 'boolean' ? data.system.toString() : data.system}
-                                  </Typography>
-                                  <Typography variant="caption" display="block" color="text.secondary">
-                                    Blockchain: {typeof data.blockchain === 'boolean' ? data.blockchain.toString() : data.blockchain}
-                                  </Typography>
-                                </Paper>
-                              ))}
+                                    {!data.match && (
+                                      <>
+                                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                                          <strong>System shows:</strong> {typeof data.system === 'boolean' ? (data.system ? 'Permitted' : 'Denied') : data.system || 'N/A'}
+                                        </Typography>
+                                        <Typography variant="caption" display="block" color="text.secondary">
+                                          <strong>Blockchain has:</strong> {typeof data.blockchain === 'boolean' ? (data.blockchain ? 'Permitted' : 'Denied') : data.blockchain || 'N/A'}
+                                        </Typography>
+                                      </>
+                                    )}
+                                  </Paper>
+                                ));
+                              })()}
                             </Stack>
+                            {verificationStatus[selectedLog.id].verified && (
+                              <Alert severity="success" sx={{ mt: 2 }}>
+                                <Typography variant="caption">
+                                  ✓ All fields match! The information shown above is accurately recorded on the blockchain and has not been tampered with.
+                                </Typography>
+                              </Alert>
+                            )}
                           </>
                         ) : null}
                       </CardContent>
