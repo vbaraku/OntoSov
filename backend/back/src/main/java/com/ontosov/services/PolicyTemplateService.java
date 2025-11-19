@@ -63,6 +63,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
 
+        // Transformations
+        template.setTransformations(new ArrayList<>());
+
         return template;
     }
 
@@ -99,6 +102,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
 
+        // Transformations
+        template.setTransformations(new ArrayList<>());
+
         return template;
     }
 
@@ -118,7 +124,7 @@ public class PolicyTemplateService {
 
         // Constraints
         Map<String, Object> constraints = new HashMap<>();
-        constraints.put("purpose", "Necessary Processing");
+        constraints.put("purpose", "Service Provision");  // Updated to match DPV taxonomy
         constraints.put("expiration", null);
         constraints.put("requiresNotification", true);
         template.setConstraints(constraints);
@@ -154,7 +160,7 @@ public class PolicyTemplateService {
 
         // Constraints
         Map<String, Object> constraints = new HashMap<>();
-        constraints.put("purpose", "Essential Services Only");
+        constraints.put("purpose", "Service Provision");  // Updated to match DPV taxonomy
         constraints.put("expiration", null);
         constraints.put("requiresNotification", true);
         template.setConstraints(constraints);

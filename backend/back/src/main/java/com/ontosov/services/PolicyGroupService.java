@@ -47,6 +47,9 @@ public class PolicyGroupService {
     private final Property allowAiTrainingProperty;
     private final Property aiAlgorithmProperty;
 
+    // Transformation properties (ODS)
+    private final Property transformationsProperty;
+
     @Autowired
     private ODRLService odrlService;
     @Autowired
@@ -85,6 +88,9 @@ public class PolicyGroupService {
         this.aiRestrictionsProperty = policyModel.createProperty(ONTOSOV_NS, "aiRestrictions");
         this.allowAiTrainingProperty = policyModel.createProperty(ONTOSOV_NS, "allowAiTraining");
         this.aiAlgorithmProperty = policyModel.createProperty(ONTOSOV_NS, "aiAlgorithm");
+
+        // Define transformation properties
+        this.transformationsProperty = policyModel.createProperty(ONTOSOV_NS, "transformations");
     }
 
     public String createPolicyGroup(PolicyGroupDTO policyGroupDTO, Long subjectId) {
@@ -186,6 +192,14 @@ public class PolicyGroupService {
 
                 policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
             }
+
+            // Add transformations (ODS actions)
+            if (policyGroupDTO.getTransformations() != null && !policyGroupDTO.getTransformations().isEmpty()) {
+                for (String transformation : policyGroupDTO.getTransformations()) {
+                    policyGroup.addProperty(transformationsProperty, transformation);
+                }
+            }
+
             // Record policy on blockchain
             try {
                 recordPolicyOnBlockchain(policyGroupId, policyModel, subjectId);
@@ -365,6 +379,21 @@ public class PolicyGroupService {
                     }
 
                     dto.setAiRestrictions(aiRestrictions);
+
+                    // Get transformations
+                    List<String> transformations = new ArrayList<>();
+                    StmtIterator transformationsIterator = policyModel.listStatements(
+                            groupResource,
+                            transformationsProperty,
+                            (RDFNode) null
+                    );
+
+                    while (transformationsIterator.hasNext()) {
+                        Statement stmt = transformationsIterator.next();
+                        transformations.add(stmt.getString());
+                    }
+
+                    dto.setTransformations(transformations);
 
                     result.add(dto);
                 }
