@@ -35,12 +35,18 @@ import {
 
 const ACTIONS = ["read", "use", "share", "aggregate", "modify", "aiTraining"];
 
+// DPV Purpose Taxonomy - aligned with subject policy creation
 const PURPOSE_OPTIONS = [
   "Service Provision",
-  "Necessary Processing",
-  "Essential Services Only",
-  "Research",
+  "Medical Treatment",
   "Marketing",
+  "Personalized Advertising",
+  "Research and Development",
+  "Academic Research",
+  "Commercial Research",
+  "Personalization",
+  "Fraud Prevention",
+  "Communication Management",
 ];
 
 const AI_ALGORITHM_OPTIONS = [
@@ -817,6 +823,10 @@ const PolicyChecker = ({ controllerId }) => {
                             <Typography variant="body2" fontWeight="bold" color="warning.dark">
                               {obligation.type === 'notify' ? 'Notification Required' :
                                obligation.type === 'compensate' ? 'Compensation Required' :
+                               obligation.type === 'anonymize' ? 'Data Must Be Anonymized' :
+                               obligation.type === 'pseudonymize' ? 'Data Must Be Pseudonymized' :
+                               obligation.type === 'encrypt' ? 'Data Must Be Encrypted' :
+                               obligation.type === 'transform' ? 'Data Transformation Required' :
                                obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
                             </Typography>
                             {obligation.details && Object.keys(obligation.details).length > 0 && (
