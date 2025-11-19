@@ -141,6 +141,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "federatedLearning");
         template.setAiRestrictions(aiRestrictions);
 
+        // Transformations
+        template.setTransformations(new ArrayList<>());
+
         return template;
     }
 
@@ -176,6 +179,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("allowAiTraining", false);
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
+
+        // Transformations
+        template.setTransformations(new ArrayList<>());
 
         return template;
     }
