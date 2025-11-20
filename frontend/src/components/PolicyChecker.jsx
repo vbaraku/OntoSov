@@ -784,14 +784,14 @@ const PolicyChecker = ({ controllerId }) => {
                       <>
                         <ListItem sx={{ py: 0.5 }}>
                           <ListItemText
-                            primary={<Typography variant="caption" color="text.secondary">Data Transformation Requirements</Typography>}
+                            primary={<Typography variant="caption" color="text.secondary" fontWeight="bold">Data Transformation Requirements</Typography>}
                             secondary={
                               <Box component="span">
                                 {decision.obligations
                                   .filter(o => ['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type))
                                   .map((obligation, index) => (
-                                    <Typography key={index} variant="body2" component="div">
-                                      {obligation.type === 'anonymize' ? 'Data must be anonymized before use' :
+                                    <Typography key={index} variant="body2" component="div" fontWeight="medium" color="warning.dark">
+                                      • {obligation.type === 'anonymize' ? 'Data must be anonymized before use' :
                                        obligation.type === 'pseudonymize' ? 'Data must be pseudonymized before use' :
                                        obligation.type === 'encrypt' ? 'Data must be encrypted before use' :
                                        'Data transformation required'}
@@ -805,35 +805,41 @@ const PolicyChecker = ({ controllerId }) => {
                     )}
                   </List>
 
-                  {/* Required Obligations */}
+                  {/* Consequences if Not Respected */}
                   {decision.obligations && decision.obligations.filter(o => !['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type)).length > 0 && (
                     <>
-                      <Divider sx={{ my: 1.5 }} />
-                      <Typography variant="subtitle1" gutterBottom>
-                        Required Obligations
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="h6" gutterBottom>
+                        Consequences if Not Respected
                       </Typography>
-                      <Alert severity="warning" sx={{ mb: 1, py: 0.5 }}>
+                      <Alert severity="warning" sx={{ mb: 1 }}>
                         <Typography variant="body2" fontWeight="medium">
-                          You must fulfill the following before accessing this data:
+                          You must fulfill the following:
                         </Typography>
                       </Alert>
                       <Box sx={{ pl: 2 }}>
                         {decision.obligations
                           .filter(o => !['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type))
                           .map((obligation, index) => (
-                            <Box key={index} sx={{ mb: 1 }}>
-                              <Typography variant="body2" fontWeight="medium" color="warning.dark">
-                                • {obligation.type === 'notify' ? 'Notification Required' :
-                                   obligation.type === 'compensate' ? 'Compensation Required' :
-                                   obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
-                                {obligation.details && Object.keys(obligation.details).length > 0 && (
-                                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                                    ({Object.entries(obligation.details).map(([key, value], i) =>
-                                      `${i > 0 ? ', ' : ''}${key}: ${value}`
-                                    ).join('')})
-                                  </Typography>
-                                )}
+                            <Box key={index} sx={{ mb: 1.5 }}>
+                              <Typography variant="body2" fontWeight="bold" color="warning.dark">
+                                {obligation.type === 'notify' ? 'Notification Required' :
+                                 obligation.type === 'compensate' ? 'Compensation Required' :
+                                 obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
                               </Typography>
+                              {obligation.details && Object.keys(obligation.details).length > 0 && (
+                                <Box sx={{ pl: 1, mt: 0.5 }}>
+                                  {Object.entries(obligation.details).map(([key, value]) => (
+                                    <Typography
+                                      key={key}
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      • {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              )}
                             </Box>
                           ))}
                       </Box>
@@ -841,13 +847,14 @@ const PolicyChecker = ({ controllerId }) => {
                   )}
 
                   {/* Next Steps Alert */}
-                  <Divider sx={{ my: 1.5 }} />
+                  <Divider sx={{ my: 2 }} />
                   {isPermit && (
-                    <Alert severity="success" sx={{ py: 0.5 }}>
+                    <Alert severity="success">
                       <Typography variant="body2">
-                        <strong>Access Granted:</strong> You may proceed.
-                        {decision.obligations && decision.obligations.length > 0 &&
-                        " Fulfill all obligations listed above."}
+                        <strong>Next Steps:</strong> You may proceed with accessing
+                        this data. {decision.obligations && decision.obligations.length > 0 &&
+                        "All consequences listed above must be fulfilled. "}
+                        This access attempt has been logged on the blockchain for transparency.
                       </Typography>
                     </Alert>
                   )}
@@ -855,7 +862,9 @@ const PolicyChecker = ({ controllerId }) => {
                   {!isPermit && (
                     <Alert severity="error">
                       <Typography variant="body2">
-                        <strong>Access Denied:</strong> The subject's policy does not permit this access.
+                        <strong>Access Denied:</strong> The subject's policy does
+                        not permit this access. This denial has been logged on the
+                        blockchain for transparency.
                       </Typography>
                     </Alert>
                   )}
