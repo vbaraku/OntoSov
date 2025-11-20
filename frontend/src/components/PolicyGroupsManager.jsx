@@ -206,67 +206,69 @@ const PolicyGroupForm = React.memo(
           />
         </FormControl>
 
-        <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-          Data Transformations
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Require data to be transformed before use
-        </Typography>
-        <Box sx={{ mb: 3 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={formState.transformations?.includes("anonymize")}
-                onChange={(e) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    transformations: e.target.checked
-                      ? [...(prev.transformations || []), "anonymize"]
-                      : (prev.transformations || []).filter(
-                          (t) => t !== "anonymize"
-                        ),
-                  }))
-                }
-              />
-            }
-            label="Anonymize"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={formState.transformations?.includes("pseudonymize")}
-                onChange={(e) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    transformations: e.target.checked
-                      ? [...(prev.transformations || []), "pseudonymize"]
-                      : (prev.transformations || []).filter(
-                          (t) => t !== "pseudonymize"
-                        ),
-                  }))
-                }
-              />
-            }
-            label="Pseudonymize"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={formState.transformations?.includes("encrypt")}
-                onChange={(e) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    transformations: e.target.checked
-                      ? [...(prev.transformations || []), "encrypt"]
-                      : (prev.transformations || []).filter(
-                          (t) => t !== "encrypt"
-                        ),
-                  }))
-                }
-              />
-            }
-            label="Encrypt"
-          />
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+            <Typography variant="subtitle2">Data Transformations</Typography>
+            <Tooltip title="Require data to be transformed (anonymized, pseudonymized, or encrypted) before the controller can use it" arrow>
+              <HelpOutlineIcon sx={{ fontSize: 18, ml: 1, color: "text.secondary" }} />
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("anonymize")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "anonymize"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "anonymize"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Anonymize"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("pseudonymize")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "pseudonymize"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "pseudonymize"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Pseudonymize"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("encrypt")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "encrypt"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "encrypt"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Encrypt"
+            />
+          </Box>
         </Box>
 
         <Typography variant="h6" gutterBottom>
@@ -1233,6 +1235,18 @@ const PolicyGroupsManager = ({
                           color="error"
                           variant="outlined"
                         />
+                      )}
+
+                      {group.transformations && group.transformations.length > 0 && (
+                        group.transformations.map((transformation) => (
+                          <Chip
+                            key={transformation}
+                            label={transformation.charAt(0).toUpperCase() + transformation.slice(1)}
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        ))
                       )}
                     </Box>
                   </Box>

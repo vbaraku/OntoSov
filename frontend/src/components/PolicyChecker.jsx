@@ -693,79 +693,65 @@ const PolicyChecker = ({ controllerId }) => {
 
                 <Box sx={{ flexGrow: 1, overflowY: "auto" }}>
                   {/* Request Summary Section */}
-                  <Typography variant="h6" gutterBottom sx={{ mt: 1 }}>
+                  <Typography variant="subtitle1" gutterBottom>
                     Request Summary
                   </Typography>
-                  <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: "grey.50" }}>
                     <Grid container spacing={1}>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Access Type
-                        </Typography>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Type</Typography>
                         <Typography variant="body2" fontWeight="medium">
-                          {currentTab === 0 ? "Property-Level" : "Entity-Level"}
+                          {currentTab === 0 ? "Property" : "Entity"}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Action
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {formData.action}
-                        </Typography>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Action</Typography>
+                        <Typography variant="body2" fontWeight="medium">{formData.action}</Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Database
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Database</Typography>
+                        <Typography variant="body2" fontWeight="medium" noWrap>
                           {databases.find(d => d.id === formData.dataSource)?.databaseName || 'N/A'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Table
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {formData.tableName}
-                        </Typography>
+                      <Grid item xs={currentTab === 0 && formData.dataProperty ? 6 : 4}>
+                        <Typography variant="caption" color="text.secondary">Table</Typography>
+                        <Typography variant="body2" fontWeight="medium" noWrap>{formData.tableName}</Typography>
                       </Grid>
                       {currentTab === 0 && formData.dataProperty && (
                         <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Column
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.dataProperty}
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary">Column</Typography>
+                          <Typography variant="body2" fontWeight="medium" noWrap>{formData.dataProperty}</Typography>
                         </Grid>
                       )}
-                      {currentTab === 1 && formData.recordId && (
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Record ID
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.recordId}
-                          </Typography>
+                      {currentTab === 1 && formData.recordId && formData.purpose && (
+                        <>
+                          <Grid item xs={4}>
+                            <Typography variant="caption" color="text.secondary">Record ID</Typography>
+                            <Typography variant="body2" fontWeight="medium">{formData.recordId}</Typography>
+                          </Grid>
+                          <Grid item xs={4}>
+                            <Typography variant="caption" color="text.secondary">Purpose</Typography>
+                            <Typography variant="body2" fontWeight="medium" noWrap>{formData.purpose}</Typography>
+                          </Grid>
+                        </>
+                      )}
+                      {currentTab === 1 && formData.recordId && !formData.purpose && (
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">Record ID</Typography>
+                          <Typography variant="body2" fontWeight="medium">{formData.recordId}</Typography>
                         </Grid>
                       )}
-                      {formData.purpose && (
-                        <Grid item xs={currentTab === 0 && formData.dataProperty ? 6 : 12}>
-                          <Typography variant="caption" color="text.secondary">
-                            Purpose
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.purpose}
-                          </Typography>
+                      {currentTab === 0 && formData.purpose && (
+                        <Grid item xs={12}>
+                          <Typography variant="caption" color="text.secondary">Purpose</Typography>
+                          <Typography variant="body2" fontWeight="medium">{formData.purpose}</Typography>
                         </Grid>
                       )}
                       {formData.action === 'aiTraining' && formData.aiAlgorithm && (
                         <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            AI Algorithm
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
+                          <Typography variant="caption" color="text.secondary">AI Algorithm</Typography>
+                          <Typography variant="body2" fontWeight="medium" noWrap>
                             {AI_ALGORITHM_OPTIONS.find(opt => opt.value === formData.aiAlgorithm)?.label || formData.aiAlgorithm}
                           </Typography>
                         </Grid>
@@ -774,25 +760,26 @@ const PolicyChecker = ({ controllerId }) => {
                   </Paper>
 
                   {/* Policy Information */}
-                  <Typography variant="h6" gutterBottom>
+                  <Typography variant="subtitle1" gutterBottom>
                     Policy Information
                   </Typography>
-                  <List dense>
-                    <ListItem>
+                  <List dense sx={{ py: 0 }}>
+                    <ListItem sx={{ py: 0.5 }}>
                       <ListItemText
-                        primary="Reason"
+                        primary={<Typography variant="caption" color="text.secondary">Reason</Typography>}
                         secondary={decision.reason}
                         secondaryTypographyProps={{
+                          variant: "body2",
                           sx: { whiteSpace: "pre-wrap" },
                         }}
                       />
                     </ListItem>
 
                     {decision.policyGroupId && (
-                      <ListItem>
+                      <ListItem sx={{ py: 0.5 }}>
                         <ListItemText
-                          primary="Policy Group ID"
-                          secondary={decision.policyGroupId}
+                          primary={<Typography variant="caption" color="text.secondary">Policy Group ID</Typography>}
+                          secondary={<Typography variant="body2" noWrap>{decision.policyGroupId}</Typography>}
                         />
                         <IconButton
                           size="small"
@@ -805,68 +792,62 @@ const PolicyChecker = ({ controllerId }) => {
                     )}
                   </List>
 
-                  {/* Consequences Section */}
+                  {/* Obligations Section */}
                   {decision.obligations && decision.obligations.length > 0 && (
                     <>
-                      <Divider sx={{ my: 2 }} />
-                      <Typography variant="h6" gutterBottom>
-                        Consequences if Not Respected
+                      <Divider sx={{ my: 1.5 }} />
+                      <Typography variant="subtitle1" gutterBottom>
+                        Required Obligations
                       </Typography>
-                      <Alert severity="warning" sx={{ mb: 1 }}>
+                      <Alert severity="warning" sx={{ mb: 1, py: 0.5 }}>
                         <Typography variant="body2" fontWeight="medium">
-                          You must fulfill the following:
+                          You must fulfill the following before accessing this data:
                         </Typography>
                       </Alert>
                       <Box sx={{ pl: 2 }}>
-                        {decision.obligations.map((obligation, index) => (
-                          <Box key={index} sx={{ mb: 1.5 }}>
-                            <Typography variant="body2" fontWeight="bold" color="warning.dark">
-                              {obligation.type === 'notify' ? 'Notification Required' :
-                               obligation.type === 'compensate' ? 'Compensation Required' :
-                               obligation.type === 'anonymize' ? 'Data Must Be Anonymized' :
-                               obligation.type === 'pseudonymize' ? 'Data Must Be Pseudonymized' :
-                               obligation.type === 'encrypt' ? 'Data Must Be Encrypted' :
-                               obligation.type === 'transform' ? 'Data Transformation Required' :
-                               obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
-                            </Typography>
-                            {obligation.details && Object.keys(obligation.details).length > 0 && (
-                              <Box sx={{ pl: 1, mt: 0.5 }}>
-                                {Object.entries(obligation.details).map(([key, value]) => (
-                                  <Typography
-                                    key={key}
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    • {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
+                        {decision.obligations.map((obligation, index) => {
+                          const isTransformation = ['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(obligation.type);
+                          return (
+                            <Box key={index} sx={{ mb: 1 }}>
+                              <Typography variant="body2" fontWeight="medium" color="warning.dark">
+                                • {obligation.type === 'notify' ? 'Notification Required' :
+                                   obligation.type === 'compensate' ? 'Compensation Required' :
+                                   obligation.type === 'anonymize' ? 'Data Must Be Anonymized' :
+                                   obligation.type === 'pseudonymize' ? 'Data Must Be Pseudonymized' :
+                                   obligation.type === 'encrypt' ? 'Data Must Be Encrypted' :
+                                   obligation.type === 'transform' ? 'Data Transformation Required' :
+                                   obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
+                                {!isTransformation && obligation.details && Object.keys(obligation.details).length > 0 && (
+                                  <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                                    ({Object.entries(obligation.details).map(([key, value], i) =>
+                                      `${i > 0 ? ', ' : ''}${key}: ${value}`
+                                    ).join('')})
                                   </Typography>
-                                ))}
-                              </Box>
-                            )}
-                          </Box>
-                        ))}
+                                )}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
                       </Box>
                     </>
                   )}
 
                   {/* Next Steps Alert */}
-                  <Divider sx={{ my: 2 }} />
+                  <Divider sx={{ my: 1.5 }} />
                   {isPermit && (
-                    <Alert severity="success">
+                    <Alert severity="success" sx={{ py: 0.5 }}>
                       <Typography variant="body2">
-                        <strong>Next Steps:</strong> You may proceed with accessing
-                        this data. {decision.obligations && decision.obligations.length > 0 &&
-                        "All consequences listed above must be fulfilled. "}
-                        This access attempt has been logged on the blockchain for transparency.
+                        <strong>Access Granted:</strong> You may proceed.
+                        {decision.obligations && decision.obligations.length > 0 &&
+                        " Fulfill all obligations listed above."}
                       </Typography>
                     </Alert>
                   )}
 
                   {!isPermit && (
-                    <Alert severity="error">
+                    <Alert severity="error" sx={{ py: 0.5 }}>
                       <Typography variant="body2">
-                        <strong>Access Denied:</strong> The subject's policy does
-                        not permit this access. This denial has been logged on the
-                        blockchain for transparency.
+                        <strong>Access Denied:</strong> The subject's policy does not permit this access.
                       </Typography>
                     </Alert>
                   )}

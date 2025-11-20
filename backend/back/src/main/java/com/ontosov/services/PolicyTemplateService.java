@@ -141,8 +141,11 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "federatedLearning");
         template.setAiRestrictions(aiRestrictions);
 
-        // Transformations
-        template.setTransformations(new ArrayList<>());
+        // Transformations - Tier 3 requires pseudonymization and encryption
+        List<String> transformations = new ArrayList<>();
+        transformations.add("pseudonymize");
+        transformations.add("encrypt");
+        template.setTransformations(transformations);
 
         return template;
     }
@@ -180,8 +183,11 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
 
-        // Transformations
-        template.setTransformations(new ArrayList<>());
+        // Transformations - Tier 4 requires anonymization and encryption
+        List<String> transformations = new ArrayList<>();
+        transformations.add("anonymize");
+        transformations.add("encrypt");
+        template.setTransformations(transformations);
 
         return template;
     }
