@@ -160,7 +160,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   {policy.constraints.purpose && (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <Description fontSize="small" />
+                        <Description fontSize="small" color="primary" />
                       </ListItemIcon>
                       <ListItemText
                         primary={`Purpose: ${policy.constraints.purpose}`}
@@ -171,7 +171,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   {policy.constraints.expiration && (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <CalendarToday fontSize="small" />
+                        <CalendarToday fontSize="small" color="info" />
                       </ListItemIcon>
                       <ListItemText
                         primary={`Expires: ${new Date(
@@ -215,7 +215,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   {policy.consequences.notificationType && (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <Notifications fontSize="small" />
+                        <Notifications fontSize="small" color="secondary" />
                       </ListItemIcon>
                       <ListItemText
                         primary={`Notification via: ${policy.consequences.notificationType}`}
@@ -226,7 +226,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   {policy.consequences.compensationAmount && (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <AttachMoney fontSize="small" />
+                        <AttachMoney fontSize="small" color="success" />
                       </ListItemIcon>
                       <ListItemText
                         primary={`Compensation: €${policy.consequences.compensationAmount}`}
@@ -257,7 +257,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   ) : policy.aiRestrictions.aiAlgorithm ? (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <Psychology fontSize="small" />
+                        <Psychology fontSize="small" color="success" />
                       </ListItemIcon>
                       <ListItemText
                         primary={`Allowed algorithm: ${formatAlgorithmName(
@@ -268,7 +268,7 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
                   ) : (
                     <ListItem disablePadding>
                       <ListItemIcon sx={{ minWidth: 36 }}>
-                        <Psychology fontSize="small" />
+                        <Psychology fontSize="small" color="success" />
                       </ListItemIcon>
                       <ListItemText primary="AI training allowed with no restrictions" />
                     </ListItem>
