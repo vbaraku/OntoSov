@@ -812,11 +812,11 @@ const PolicyChecker = ({ controllerId }) => {
                       <Typography variant="h6" gutterBottom>
                         Consequences if Not Respected
                       </Typography>
-                      <Alert severity="warning" sx={{ mb: 1 }}>
+                      {/* <Alert severity="warning" sx={{ mb: 1 }}>
                         <Typography variant="body2" fontWeight="medium">
                           You must fulfill the following:
                         </Typography>
-                      </Alert>
+                      </Alert> */}
                       <Box sx={{ pl: 2 }}>
                         {decision.obligations
                           .filter(o => !['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type))
