@@ -63,6 +63,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
 
+        // Transformations
+        template.setTransformations(new ArrayList<>());
+
         return template;
     }
 
@@ -99,6 +102,9 @@ public class PolicyTemplateService {
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
 
+        // Transformations
+        template.setTransformations(new ArrayList<>());
+
         return template;
     }
 
@@ -118,7 +124,7 @@ public class PolicyTemplateService {
 
         // Constraints
         Map<String, Object> constraints = new HashMap<>();
-        constraints.put("purpose", "Necessary Processing");
+        constraints.put("purpose", "Service Provision");  // Updated to match DPV taxonomy
         constraints.put("expiration", null);
         constraints.put("requiresNotification", true);
         template.setConstraints(constraints);
@@ -134,6 +140,12 @@ public class PolicyTemplateService {
         aiRestrictions.put("allowAiTraining", true);
         aiRestrictions.put("aiAlgorithm", "federatedLearning");
         template.setAiRestrictions(aiRestrictions);
+
+        // Transformations - Tier 3 requires pseudonymization and encryption
+        List<String> transformations = new ArrayList<>();
+        transformations.add("pseudonymize");
+        transformations.add("encrypt");
+        template.setTransformations(transformations);
 
         return template;
     }
@@ -154,7 +166,7 @@ public class PolicyTemplateService {
 
         // Constraints
         Map<String, Object> constraints = new HashMap<>();
-        constraints.put("purpose", "Essential Services Only");
+        constraints.put("purpose", "Service Provision");  // Updated to match DPV taxonomy
         constraints.put("expiration", null);
         constraints.put("requiresNotification", true);
         template.setConstraints(constraints);
@@ -170,6 +182,12 @@ public class PolicyTemplateService {
         aiRestrictions.put("allowAiTraining", false);
         aiRestrictions.put("aiAlgorithm", "");
         template.setAiRestrictions(aiRestrictions);
+
+        // Transformations - Tier 4 requires anonymization and encryption
+        List<String> transformations = new ArrayList<>();
+        transformations.add("anonymize");
+        transformations.add("encrypt");
+        template.setTransformations(transformations);
 
         return template;
     }

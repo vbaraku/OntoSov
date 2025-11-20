@@ -38,6 +38,20 @@ import AddIcon from "@mui/icons-material/Add";
 import LayersIcon from "@mui/icons-material/Layers";
 import PolicyIcon from "@mui/icons-material/Policy";
 
+// DPV Purpose Taxonomy Options
+const DPV_PURPOSES = [
+  { value: "Service Provision", label: "Service Provision" },
+  { value: "Medical Treatment", label: "Medical Treatment" },
+  { value: "Marketing", label: "Marketing" },
+  { value: "Personalized Advertising", label: "Personalized Advertising" },
+  { value: "Research and Development", label: "Research and Development" },
+  { value: "Academic Research", label: "Academic Research" },
+  { value: "Commercial Research", label: "Commercial Research" },
+  { value: "Personalization", label: "Personalization" },
+  { value: "Fraud Prevention", label: "Fraud Prevention" },
+  { value: "Communication Management", label: "Communication Management" },
+];
+
 const tooltips = {
   read: "Basic access to view the data (e.g., viewing your profile information)",
   use: "Using data for operations (e.g., processing transactions, providing services)",
@@ -74,6 +88,7 @@ const initialFormState = {
     allowAiTraining: true,
     aiAlgorithm: "",
   },
+  transformations: [],
 };
 
 const PolicyGroupForm = React.memo(
@@ -142,9 +157,10 @@ const PolicyGroupForm = React.memo(
           Constraints
         </Typography>
         <FormControl fullWidth sx={{ mb: 2 }}>
-          <TextField
-            label="Purpose"
+          <InputLabel>Purpose</InputLabel>
+          <Select
             value={formState.constraints.purpose}
+            label="Purpose"
             onChange={(e) =>
               setFormState((prev) => ({
                 ...prev,
@@ -154,8 +170,19 @@ const PolicyGroupForm = React.memo(
                 },
               }))
             }
-            placeholder="e.g., Marketing, Research, Service Provision"
-          />
+          >
+            <MenuItem value="">
+              <em>None</em>
+            </MenuItem>
+            {DPV_PURPOSES.map((purpose) => (
+              <MenuItem key={purpose.value} value={purpose.value}>
+                {purpose.label}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>
+            Select the purpose for data processing
+          </FormHelperText>
         </FormControl>
 
         <FormControl fullWidth sx={{ mb: 3 }}>
@@ -178,6 +205,71 @@ const PolicyGroupForm = React.memo(
             }}
           />
         </FormControl>
+
+        <Box sx={{ mb: 3, mt: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+            <Typography variant="h6">Data Transformations</Typography>
+            <Tooltip title="Require data to be transformed (anonymized, pseudonymized, or encrypted) before the controller can use it" arrow>
+              <HelpOutlineIcon sx={{ fontSize: 18, ml: 1, color: "text.secondary" }} />
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("anonymize")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "anonymize"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "anonymize"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Anonymize"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("pseudonymize")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "pseudonymize"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "pseudonymize"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Pseudonymize"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formState.transformations?.includes("encrypt")}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      transformations: e.target.checked
+                        ? [...(prev.transformations || []), "encrypt"]
+                        : (prev.transformations || []).filter(
+                            (t) => t !== "encrypt"
+                          ),
+                    }))
+                  }
+                />
+              }
+              label="Encrypt"
+            />
+          </Box>
+        </Box>
 
         <Typography variant="h6" gutterBottom>
           Consequences
@@ -1143,6 +1235,18 @@ const PolicyGroupsManager = ({
                           color="error"
                           variant="outlined"
                         />
+                      )}
+
+                      {group.transformations && group.transformations.length > 0 && (
+                        group.transformations.map((transformation) => (
+                          <Chip
+                            key={transformation}
+                            label={transformation.charAt(0).toUpperCase() + transformation.slice(1)}
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        ))
                       )}
                     </Box>
                   </Box>

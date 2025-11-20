@@ -1,5 +1,6 @@
 package com.ontosov.services;
 
+import com.ontosov.constants.DPVPurpose;
 import com.ontosov.dto.*;
 import com.ontosov.models.User;
 import com.ontosov.repositories.UserRepo;
@@ -540,7 +541,13 @@ public class PolicyEvaluationService {
                     if (requestPurpose == null || requestPurpose.trim().isEmpty()) {
                         return false;
                     }
-                    if (!requestPurpose.toLowerCase().contains(requiredPurpose.toLowerCase())) {
+
+                    // Support both DPV labels and URIs
+                    // Convert purposes to comparable format
+                    String normalizedRequired = normalizePurpose(requiredPurpose);
+                    String normalizedRequest = normalizePurpose(requestPurpose);
+
+                    if (!normalizedRequest.toLowerCase().contains(normalizedRequired.toLowerCase())) {
                         return false;
                     }
                 }
@@ -611,6 +618,24 @@ public class PolicyEvaluationService {
     }
 
     /**
+     * Helper: Normalize purpose for comparison (supports both DPV URIs and labels)
+     */
+    private String normalizePurpose(String purpose) {
+        if (purpose == null || purpose.trim().isEmpty()) {
+            return "";
+        }
+
+        // If it's a URI, try to convert to label
+        if (purpose.startsWith("http")) {
+            String label = DPVPurpose.getLabel(purpose);
+            return label != null ? label : purpose;
+        }
+
+        // If it's a label, it might also have a URI equivalent - return label as-is
+        return purpose;
+    }
+
+    /**
      * Helper: Determine if purpose is AI-related
      */
     private boolean isAiRelatedPurpose(String purpose) {
@@ -660,6 +685,16 @@ public class PolicyEvaluationService {
                 compensation.setType("compensate");
                 compensation.getDetails().put("amount", amount);
                 obligations.add(compensation);
+            }
+        }
+
+        // Check for transformation duties (ODS actions)
+        if (policy.getTransformations() != null && !policy.getTransformations().isEmpty()) {
+            for (String transformation : policy.getTransformations()) {
+                ObligationDTO transformationObligation = new ObligationDTO();
+                transformationObligation.setType(transformation.toLowerCase());
+                transformationObligation.getDetails().put("action", "Data must be " + transformation.toLowerCase() + "d before use");
+                obligations.add(transformationObligation);
             }
         }
 

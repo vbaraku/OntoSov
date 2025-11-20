@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ontosov.constants.DPVPurpose;
 import com.ontosov.dto.PolicyAssignmentDTO;
 import com.ontosov.dto.PolicyGroupDTO;
 
@@ -30,6 +31,9 @@ public class ODRLService {
     private static final String ONTOSOV_NS = "http://ontosov.org/policy#";
     private static final String ODRL_NS = "http://www.w3.org/ns/odrl/2/";
     private static final String SCHEMA_NS = "http://schema.org/";
+    private static final String ODS_NS = "https://w3id.org/ods/";
+    private static final String DPV_NS = "https://w3id.org/dpv#";
+    private static final String OAC_NS = "https://w3id.org/oac/";
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final Dataset dataset;
@@ -66,6 +70,15 @@ public class ODRLService {
     // ONTOSOV vocabulary
     private final Property dataSourceProperty;
     private final Property dataPropertyProperty;
+
+    // ODS transformation actions
+    private final Resource anonymizeAction;
+    private final Resource pseudonymizeAction;
+    private final Resource encryptAction;
+    private final Resource transformAction;
+
+    // DPV purpose property (OAC vocabulary)
+    private final Property oacPurposeProperty;
 
     public ODRLService() {
         // Initialize dataset and model
@@ -110,6 +123,15 @@ public class ODRLService {
         // Initialize custom properties
         this.dataSourceProperty = odrlModel.createProperty(ONTOSOV_NS, "dataSource");
         this.dataPropertyProperty = odrlModel.createProperty(ONTOSOV_NS, "dataProperty");
+
+        // Initialize ODS transformation actions
+        this.anonymizeAction = odrlModel.createResource(ODS_NS + "anonymize");
+        this.pseudonymizeAction = odrlModel.createResource(ODS_NS + "pseudonymize");
+        this.encryptAction = odrlModel.createResource(ODS_NS + "encrypt");
+        this.transformAction = odrlModel.createResource(ODS_NS + "transform");
+
+        // Initialize DPV purpose property (OAC vocabulary)
+        this.oacPurposeProperty = odrlModel.createProperty(OAC_NS, "Purpose");
     }
 
     public void generatePoliciesFromAssignment(String policyGroupId, PolicyGroupDTO policyGroup,
@@ -132,7 +154,8 @@ public class ODRLService {
                                 createPropertyPolicy(policyGroupId, subjectId, dataSource, property, action,
                                         policyGroup.getConstraints(),
                                         policyGroup.getConsequences(),
-                                        policyGroup.getAiRestrictions());
+                                        policyGroup.getAiRestrictions(),
+                                        policyGroup.getTransformations());
                             }
                         }
 
@@ -141,7 +164,8 @@ public class ODRLService {
                             createPropertyPolicy(policyGroupId, subjectId, dataSource, property, "aiTraining",
                                     policyGroup.getConstraints(),
                                     policyGroup.getConsequences(),
-                                    policyGroup.getAiRestrictions());
+                                    policyGroup.getAiRestrictions(),
+                                    policyGroup.getTransformations());
                         }
                     }
                 }
@@ -162,7 +186,8 @@ public class ODRLService {
                                 createEntityPolicy(policyGroupId, subjectId, dataSource, entityType, entityId, action,
                                         policyGroup.getConstraints(),
                                         policyGroup.getConsequences(),
-                                        policyGroup.getAiRestrictions());
+                                        policyGroup.getAiRestrictions(),
+                                        policyGroup.getTransformations());
                             }
                         }
 
@@ -171,7 +196,8 @@ public class ODRLService {
                             createEntityPolicy(policyGroupId, subjectId, dataSource, entityType, entityId, "aiTraining",
                                     policyGroup.getConstraints(),
                                     policyGroup.getConsequences(),
-                                    policyGroup.getAiRestrictions());
+                                    policyGroup.getAiRestrictions(),
+                                    policyGroup.getTransformations());
                         }
                     }
                 }
@@ -184,7 +210,8 @@ public class ODRLService {
 
     private void createPropertyPolicy(String policyGroupId, Long subjectId, String dataSource,
                                       String property, String action, Map<String, Object> constraints,
-                                      Map<String, Object> consequences, Map<String, Object> aiRestrictions) {
+                                      Map<String, Object> consequences, Map<String, Object> aiRestrictions,
+                                      List<String> transformations) {
         // Create a unique ID for the policy
         String policyId = "policy-" + UUID.randomUUID().toString();
         Resource policy = odrlModel.createResource(ODRL_NS + policyId);
@@ -221,23 +248,37 @@ public class ODRLService {
 
         // Add constraints if present
         if (constraints != null && !constraints.isEmpty()) {
-            Resource constraint = odrlModel.createResource();
-            constraint.addProperty(RDF.type, constraintResource);
-
-            // Purpose constraint
+            // Purpose constraint using DPV taxonomy
             if (constraints.containsKey("purpose") && constraints.get("purpose") != null &&
                     !constraints.get("purpose").toString().isEmpty()) {
-                constraint.addProperty(purposeProperty, constraints.get("purpose").toString());
+                String purposeValue = constraints.get("purpose").toString();
+
+                // Convert label to URI if needed, or use as-is if already a URI
+                String purposeUri = purposeValue;
+                if (!purposeValue.startsWith("http")) {
+                    // Try to convert label to DPV URI
+                    String dpvUri = DPVPurpose.getUri(purposeValue);
+                    if (dpvUri != null) {
+                        purposeUri = dpvUri;
+                    }
+                }
+
+                // Create constraint using OAC:Purpose pattern
+                Resource purposeConstraint = odrlModel.createResource();
+                purposeConstraint.addProperty(RDF.type, constraintResource);
+                purposeConstraint.addProperty(leftOperandProperty, oacPurposeProperty);
+                purposeConstraint.addProperty(operatorProperty, odrlModel.createResource(ODRL_NS + "isA"));
+                purposeConstraint.addProperty(rightOperandProperty, odrlModel.createResource(purposeUri));
+
+                permission.addProperty(constraintProperty, purposeConstraint);
             }
 
             // Expiration constraint
             if (constraints.containsKey("expiration") && constraints.get("expiration") != null) {
-                constraint.addProperty(dateTimeProperty, constraints.get("expiration").toString());
-            }
-
-            // Only add the constraint if it has any properties
-            if (constraint.listProperties().hasNext()) {
-                permission.addProperty(constraintProperty, constraint);
+                Resource expirationConstraint = odrlModel.createResource();
+                expirationConstraint.addProperty(RDF.type, constraintResource);
+                expirationConstraint.addProperty(dateTimeProperty, constraints.get("expiration").toString());
+                permission.addProperty(constraintProperty, expirationConstraint);
             }
         }
 
@@ -285,6 +326,39 @@ public class ODRLService {
                 }
 
                 permission.addProperty(consequenceProperty, consequence);
+            }
+        }
+
+        // Add transformation duties if present
+        if (transformations != null && !transformations.isEmpty()) {
+            for (String transformation : transformations) {
+                Resource transformationDuty = odrlModel.createResource();
+                transformationDuty.addProperty(RDF.type, dutyResource);
+
+                // Map transformation name to ODS action resource
+                Resource transformationAction = null;
+                switch (transformation.toLowerCase()) {
+                    case "anonymize":
+                        transformationAction = anonymizeAction;
+                        break;
+                    case "pseudonymize":
+                        transformationAction = pseudonymizeAction;
+                        break;
+                    case "encrypt":
+                        transformationAction = encryptAction;
+                        break;
+                    case "transform":
+                        transformationAction = transformAction;
+                        break;
+                    default:
+                        log.warn("Unknown transformation action: " + transformation);
+                        continue;
+                }
+
+                if (transformationAction != null) {
+                    transformationDuty.addProperty(actionProperty, transformationAction);
+                    permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), transformationDuty);
+                }
             }
         }
 
@@ -340,7 +414,7 @@ public class ODRLService {
     private void createEntityPolicy(String policyGroupId, Long subjectId, String dataSource,
                                     String entityType, String entityId, String action,
                                     Map<String, Object> constraints, Map<String, Object> consequences,
-                                    Map<String, Object> aiRestrictions) {
+                                    Map<String, Object> aiRestrictions, List<String> transformations) {
         // Create a unique ID for the policy
         String policyId = "policy-" + UUID.randomUUID().toString();
         Resource policy = odrlModel.createResource(ODRL_NS + policyId);
@@ -372,23 +446,40 @@ public class ODRLService {
         permission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
         permission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
 
-        // Add constraints if they exist (inline logic)
+        // Add constraints if they exist
         if (constraints != null && !constraints.isEmpty()) {
-            Resource constraint = odrlModel.createResource();
-
+            // Purpose constraint using DPV taxonomy
             if (constraints.containsKey("purpose") && constraints.get("purpose") != null &&
                     !constraints.get("purpose").toString().isEmpty()) {
-                constraint.addProperty(purposeProperty, constraints.get("purpose").toString());
+                String purposeValue = constraints.get("purpose").toString();
+
+                // Convert label to URI if needed, or use as-is if already a URI
+                String purposeUri = purposeValue;
+                if (!purposeValue.startsWith("http")) {
+                    // Try to convert label to DPV URI
+                    String dpvUri = DPVPurpose.getUri(purposeValue);
+                    if (dpvUri != null) {
+                        purposeUri = dpvUri;
+                    }
+                }
+
+                // Create constraint using OAC:Purpose pattern
+                Resource purposeConstraint = odrlModel.createResource();
+                purposeConstraint.addProperty(RDF.type, constraintResource);
+                purposeConstraint.addProperty(leftOperandProperty, oacPurposeProperty);
+                purposeConstraint.addProperty(operatorProperty, odrlModel.createResource(ODRL_NS + "isA"));
+                purposeConstraint.addProperty(rightOperandProperty, odrlModel.createResource(purposeUri));
+
+                permission.addProperty(constraintProperty, purposeConstraint);
             }
 
+            // Expiration constraint
             if (constraints.containsKey("expiration") && constraints.get("expiration") != null &&
                     !constraints.get("expiration").toString().isEmpty()) {
-                constraint.addProperty(dateTimeProperty, constraints.get("expiration").toString());
-            }
-
-            // Only add constraint resource if it has properties
-            if (constraint.listProperties().hasNext()) {
-                permission.addProperty(constraintProperty, constraint);
+                Resource expirationConstraint = odrlModel.createResource();
+                expirationConstraint.addProperty(RDF.type, constraintResource);
+                expirationConstraint.addProperty(dateTimeProperty, constraints.get("expiration").toString());
+                permission.addProperty(constraintProperty, expirationConstraint);
             }
         }
 
@@ -410,6 +501,39 @@ public class ODRLService {
                 compensationDuty.addProperty(actionProperty, odrlModel.createResource(ODRL_NS + "compensate"));
                 compensationDuty.addProperty(compensationProperty, consequences.get("compensationAmount").toString());
                 permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), compensationDuty);
+            }
+        }
+
+        // Add transformation duties if present
+        if (transformations != null && !transformations.isEmpty()) {
+            for (String transformation : transformations) {
+                Resource transformationDuty = odrlModel.createResource();
+                transformationDuty.addProperty(RDF.type, dutyResource);
+
+                // Map transformation name to ODS action resource
+                Resource transformationAction = null;
+                switch (transformation.toLowerCase()) {
+                    case "anonymize":
+                        transformationAction = anonymizeAction;
+                        break;
+                    case "pseudonymize":
+                        transformationAction = pseudonymizeAction;
+                        break;
+                    case "encrypt":
+                        transformationAction = encryptAction;
+                        break;
+                    case "transform":
+                        transformationAction = transformAction;
+                        break;
+                    default:
+                        log.warn("Unknown transformation action: " + transformation);
+                        continue;
+                }
+
+                if (transformationAction != null) {
+                    transformationDuty.addProperty(actionProperty, transformationAction);
+                    permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), transformationDuty);
+                }
             }
         }
 

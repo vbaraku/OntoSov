@@ -35,12 +35,18 @@ import {
 
 const ACTIONS = ["read", "use", "share", "aggregate", "modify", "aiTraining"];
 
+// DPV Purpose Taxonomy - aligned with subject policy creation
 const PURPOSE_OPTIONS = [
   "Service Provision",
-  "Necessary Processing",
-  "Essential Services Only",
-  "Research",
+  "Medical Treatment",
   "Marketing",
+  "Personalized Advertising",
+  "Research and Development",
+  "Academic Research",
+  "Commercial Research",
+  "Personalization",
+  "Fraud Prevention",
+  "Communication Management",
 ];
 
 const AI_ALGORITHM_OPTIONS = [
@@ -687,79 +693,53 @@ const PolicyChecker = ({ controllerId }) => {
 
                 <Box sx={{ flexGrow: 1, overflowY: "auto" }}>
                   {/* Request Summary Section */}
-                  <Typography variant="h6" gutterBottom sx={{ mt: 1 }}>
+                  <Typography variant="h6" gutterBottom>
                     Request Summary
                   </Typography>
                   <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
-                    <Grid container spacing={1}>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Access Type
-                        </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Type</Typography>
                         <Typography variant="body2" fontWeight="medium">
                           {currentTab === 0 ? "Property-Level" : "Entity-Level"}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Action
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {formData.action}
-                        </Typography>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Action</Typography>
+                        <Typography variant="body2" fontWeight="medium">{formData.action}</Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Database
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Database</Typography>
+                        <Typography variant="body2" fontWeight="medium" noWrap>
                           {databases.find(d => d.id === formData.dataSource)?.databaseName || 'N/A'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Table
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {formData.tableName}
-                        </Typography>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">Table</Typography>
+                        <Typography variant="body2" fontWeight="medium" noWrap>{formData.tableName}</Typography>
                       </Grid>
                       {currentTab === 0 && formData.dataProperty && (
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Column
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.dataProperty}
-                          </Typography>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">Column</Typography>
+                          <Typography variant="body2" fontWeight="medium" noWrap>{formData.dataProperty}</Typography>
                         </Grid>
                       )}
                       {currentTab === 1 && formData.recordId && (
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            Record ID
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.recordId}
-                          </Typography>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">Record ID</Typography>
+                          <Typography variant="body2" fontWeight="medium">{formData.recordId}</Typography>
                         </Grid>
                       )}
                       {formData.purpose && (
-                        <Grid item xs={currentTab === 0 && formData.dataProperty ? 6 : 12}>
-                          <Typography variant="caption" color="text.secondary">
-                            Purpose
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
-                            {formData.purpose}
-                          </Typography>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">Purpose</Typography>
+                          <Typography variant="body2" fontWeight="medium">{formData.purpose}</Typography>
                         </Grid>
                       )}
                       {formData.action === 'aiTraining' && formData.aiAlgorithm && (
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary">
-                            AI Algorithm
-                          </Typography>
-                          <Typography variant="body2" fontWeight="medium">
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">AI Algorithm</Typography>
+                          <Typography variant="body2" fontWeight="medium" noWrap>
                             {AI_ALGORITHM_OPTIONS.find(opt => opt.value === formData.aiAlgorithm)?.label || formData.aiAlgorithm}
                           </Typography>
                         </Grid>
@@ -772,21 +752,22 @@ const PolicyChecker = ({ controllerId }) => {
                     Policy Information
                   </Typography>
                   <List dense>
-                    <ListItem>
+                    <ListItem sx={{ py: 0.5 }}>
                       <ListItemText
-                        primary="Reason"
+                        primary={<Typography variant="caption" color="text.secondary">Reason</Typography>}
                         secondary={decision.reason}
                         secondaryTypographyProps={{
+                          variant: "body2",
                           sx: { whiteSpace: "pre-wrap" },
                         }}
                       />
                     </ListItem>
 
                     {decision.policyGroupId && (
-                      <ListItem>
+                      <ListItem sx={{ py: 0.5 }}>
                         <ListItemText
-                          primary="Policy Group ID"
-                          secondary={decision.policyGroupId}
+                          primary={<Typography variant="caption" color="text.secondary">Policy Group ID</Typography>}
+                          secondary={<Typography variant="body2" noWrap>{decision.policyGroupId}</Typography>}
                         />
                         <IconButton
                           size="small"
@@ -797,43 +778,70 @@ const PolicyChecker = ({ controllerId }) => {
                         </IconButton>
                       </ListItem>
                     )}
+
+                    {/* Data Transformation Requirements - Moved under Policy Information */}
+                    {decision.obligations && decision.obligations.filter(o => ['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type)).length > 0 && (
+                      <>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemText
+                            primary={<Typography variant="caption" color="text.secondary" fontWeight="bold">Data Transformation Requirements</Typography>}
+                            secondary={
+                              <Box component="span">
+                                {decision.obligations
+                                  .filter(o => ['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type))
+                                  .map((obligation, index) => (
+                                    <Typography key={index} variant="body2" component="div" fontWeight="medium" color="warning.dark">
+                                      • {obligation.type === 'anonymize' ? 'Data must be anonymized before use' :
+                                       obligation.type === 'pseudonymize' ? 'Data must be pseudonymized before use' :
+                                       obligation.type === 'encrypt' ? 'Data must be encrypted before use' :
+                                       'Data transformation required'}
+                                    </Typography>
+                                  ))}
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      </>
+                    )}
                   </List>
 
-                  {/* Consequences Section */}
-                  {decision.obligations && decision.obligations.length > 0 && (
+                  {/* Consequences if Not Respected */}
+                  {decision.obligations && decision.obligations.filter(o => !['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type)).length > 0 && (
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="h6" gutterBottom>
                         Consequences if Not Respected
                       </Typography>
-                      <Alert severity="warning" sx={{ mb: 1 }}>
+                      {/* <Alert severity="warning" sx={{ mb: 1 }}>
                         <Typography variant="body2" fontWeight="medium">
                           You must fulfill the following:
                         </Typography>
-                      </Alert>
+                      </Alert> */}
                       <Box sx={{ pl: 2 }}>
-                        {decision.obligations.map((obligation, index) => (
-                          <Box key={index} sx={{ mb: 1.5 }}>
-                            <Typography variant="body2" fontWeight="bold" color="warning.dark">
-                              {obligation.type === 'notify' ? 'Notification Required' :
-                               obligation.type === 'compensate' ? 'Compensation Required' :
-                               obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
-                            </Typography>
-                            {obligation.details && Object.keys(obligation.details).length > 0 && (
-                              <Box sx={{ pl: 1, mt: 0.5 }}>
-                                {Object.entries(obligation.details).map(([key, value]) => (
-                                  <Typography
-                                    key={key}
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    • {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
-                                  </Typography>
-                                ))}
-                              </Box>
-                            )}
-                          </Box>
-                        ))}
+                        {decision.obligations
+                          .filter(o => !['anonymize', 'pseudonymize', 'encrypt', 'transform'].includes(o.type))
+                          .map((obligation, index) => (
+                            <Box key={index} sx={{ mb: 1.5 }}>
+                              <Typography variant="body2" fontWeight="bold" color="warning.dark">
+                                {obligation.type === 'notify' ? 'Notification Required' :
+                                 obligation.type === 'compensate' ? 'Compensation Required' :
+                                 obligation.type?.charAt(0).toUpperCase() + obligation.type?.slice(1)}
+                              </Typography>
+                              {obligation.details && Object.keys(obligation.details).length > 0 && (
+                                <Box sx={{ pl: 1, mt: 0.5 }}>
+                                  {Object.entries(obligation.details).map(([key, value]) => (
+                                    <Typography
+                                      key={key}
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      • {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              )}
+                            </Box>
+                          ))}
                       </Box>
                     </>
                   )}

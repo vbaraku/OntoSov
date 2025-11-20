@@ -235,6 +235,7 @@ const SubjectPage = () => {
             constraints: policyGroup.constraints,
             consequences: policyGroup.consequences,
             aiRestrictions: policyGroup.aiRestrictions,
+            transformations: policyGroup.transformations,
           });
         } else {
           policies.push({
@@ -269,6 +270,7 @@ const SubjectPage = () => {
             constraints: policyGroup.constraints,
             consequences: policyGroup.consequences,
             aiRestrictions: policyGroup.aiRestrictions,
+            transformations: policyGroup.transformations,
           });
         } else {
           policies.push({
