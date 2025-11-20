@@ -206,9 +206,9 @@ const PolicyGroupForm = React.memo(
           />
         </FormControl>
 
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 3, mt: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle2">Data Transformations</Typography>
+            <Typography variant="h6">Data Transformations</Typography>
             <Tooltip title="Require data to be transformed (anonymized, pseudonymized, or encrypted) before the controller can use it" arrow>
               <HelpOutlineIcon sx={{ fontSize: 18, ml: 1, color: "text.secondary" }} />
             </Tooltip>

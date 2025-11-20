@@ -184,6 +184,27 @@ const PolicyDetailsDialog = ({ open, onClose, details }) => {
               </Box>
             )}
 
+            {/* Display transformations if present */}
+            {policy.transformations && policy.transformations.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Data Transformation Requirements
+                </Typography>
+                <List dense disablePadding>
+                  {policy.transformations.map((transformation) => (
+                    <ListItem key={transformation} disablePadding>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <Lock fontSize="small" color="warning" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={`Data must be ${transformation}d before use`}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+
             {/* Display consequences if present */}
             {policy.consequences && (
               <Box sx={{ mt: 2 }}>
