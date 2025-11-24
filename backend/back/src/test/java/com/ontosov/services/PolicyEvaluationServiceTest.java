@@ -26,8 +26,6 @@ import static org.mockito.Mockito.*;
  *
  * Tests the Policy Decision Point (PDP) for correct access control decisions
  * across all policy enforcement scenarios.
- *
- * @author Vijon Baraku
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PolicyEvaluationService Test Suite")
