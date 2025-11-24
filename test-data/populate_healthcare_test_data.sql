@@ -14,11 +14,12 @@
 -- ============================================================================
 -- SECTION 1: Test Patients
 -- ============================================================================
+-- Note: tax_identifier should match ecommerce tax_id (9 char limit)
 INSERT IGNORE INTO patients (patient_id, tax_identifier, given_name, family_name, email, birth_date) VALUES
-(9990010, 'TEST0000010', 'Test', 'User Small', 'test.small@example.com', '1985-03-15'),
-(9990100, 'TEST0000100', 'Test', 'User Medium', 'test.medium@example.com', '1978-07-22'),
-(9991000, 'TEST0001000', 'Test', 'User Large', 'test.large@example.com', '1990-11-08'),
-(9910000, 'TEST0010000', 'Test', 'User XLarge', 'test.xlarge@example.com', '1982-05-30');
+(9990010, 'TST000010', 'Test', 'User Small', 'test.small@example.com', '1985-03-15'),
+(9990100, 'TST000100', 'Test', 'User Medium', 'test.medium@example.com', '1978-07-22'),
+(9991000, 'TST001000', 'Test', 'User Large', 'test.large@example.com', '1990-11-08'),
+(9910000, 'TST010000', 'Test', 'User XLarge', 'test.xlarge@example.com', '1982-05-30');
 
 -- ============================================================================
 -- SECTION 2: Medical Records for TEST0000010 (Small - 10 records)

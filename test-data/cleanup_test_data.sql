@@ -16,7 +16,7 @@
 DELETE FROM order_history WHERE order_id >= 9900000 AND order_id <= 9999999;
 
 -- Delete test user profiles
-DELETE FROM user_profiles WHERE tax_id LIKE 'TEST%';
+DELETE FROM user_profiles WHERE tax_id LIKE 'TST%';
 
 -- Alternative: Delete by user_id range
 -- DELETE FROM user_profiles WHERE user_id >= 9990010 AND user_id <= 9910000;
@@ -25,7 +25,7 @@ DELETE FROM user_profiles WHERE tax_id LIKE 'TEST%';
 DELETE FROM products WHERE product_id >= 990001 AND product_id <= 990500;
 
 -- Verification query for PostgreSQL:
--- SELECT 'user_profiles' as table_name, COUNT(*) as test_records FROM user_profiles WHERE tax_id LIKE 'TEST%'
+-- SELECT 'user_profiles' as table_name, COUNT(*) as test_records FROM user_profiles WHERE tax_id LIKE 'TST%'
 -- UNION ALL
 -- SELECT 'order_history', COUNT(*) FROM order_history WHERE order_id >= 9900000
 -- UNION ALL
@@ -41,13 +41,13 @@ DELETE FROM products WHERE product_id >= 990001 AND product_id <= 990500;
 DELETE FROM medical_records WHERE record_id >= 9900000 AND record_id <= 9999999;
 
 -- Delete test patients
-DELETE FROM patients WHERE tax_identifier LIKE 'TEST%';
+DELETE FROM patients WHERE tax_identifier LIKE 'TST%';
 
 -- Alternative: Delete by patient_id range
 -- DELETE FROM patients WHERE patient_id >= 9990010 AND patient_id <= 9910000;
 
 -- Verification query for MySQL:
--- SELECT 'patients' as table_name, COUNT(*) as test_records FROM patients WHERE tax_identifier LIKE 'TEST%'
+-- SELECT 'patients' as table_name, COUNT(*) as test_records FROM patients WHERE tax_identifier LIKE 'TST%'
 -- UNION ALL
 -- SELECT 'medical_records', COUNT(*) FROM medical_records WHERE record_id >= 9900000;
 
@@ -60,7 +60,7 @@ DELETE FROM patients WHERE tax_identifier LIKE 'TEST%';
 /*
 BEGIN;
 DELETE FROM order_history WHERE order_id >= 9900000 AND order_id <= 9999999;
-DELETE FROM user_profiles WHERE tax_id LIKE 'TEST%';
+DELETE FROM user_profiles WHERE tax_id LIKE 'TST%';
 DELETE FROM products WHERE product_id >= 990001 AND product_id <= 990500;
 COMMIT;
 */
@@ -69,6 +69,6 @@ COMMIT;
 /*
 START TRANSACTION;
 DELETE FROM medical_records WHERE record_id >= 9900000 AND record_id <= 9999999;
-DELETE FROM patients WHERE tax_identifier LIKE 'TEST%';
+DELETE FROM patients WHERE tax_identifier LIKE 'TST%';
 COMMIT;
 */

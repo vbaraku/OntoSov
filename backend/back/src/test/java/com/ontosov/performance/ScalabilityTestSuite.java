@@ -49,11 +49,11 @@ class ScalabilityTestSuite {
     private static final String RESULTS_DIR = "test-results";
     private static final String RESULTS_FILE = RESULTS_DIR + "/scalability-results.csv";
 
-    // Test subject tax IDs
-    private static final String TAX_ID_SMALL = "TEST0000010";
-    private static final String TAX_ID_MEDIUM = "TEST0000100";
-    private static final String TAX_ID_LARGE = "TEST0001000";
-    private static final String TAX_ID_XLARGE = "TEST0010000";
+    // Test subject tax IDs (9 char limit for tax_id column)
+    private static final String TAX_ID_SMALL = "TST000010";
+    private static final String TAX_ID_MEDIUM = "TST000100";
+    private static final String TAX_ID_LARGE = "TST001000";
+    private static final String TAX_ID_XLARGE = "TST010000";
 
     // Expected record counts (orders + medical records combined)
     private static final int EXPECTED_SMALL = 10;
