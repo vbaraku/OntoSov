@@ -1,0 +1,11 @@
+    timestamp,test_type,scale,expected_records,actual_records,duration_ms,avg_duration_ms,min_duration_ms,max_duration_ms,overhead_percent,notes
+2025-11-24T18:33:12.3316343,Concurrent_Queries,5_Parallel,5,5,3137,3134,0,3136,0.00,"5 parallel queries using TST000100"
+2025-11-24T18:33:13.8304202,Concurrent_Queries,10_Parallel,10,10,1489,1183,0,1488,0.00,"10 parallel queries using TST000100"
+2025-11-24T18:33:16.6077396,Baseline_Comparison,Small,10,78,386,386,367,437,201.56,"SPARQL vs estimated SQL baseline"
+2025-11-24T18:33:19.4457426,Baseline_Comparison,Medium,100,558,399,399,375,429,200.00,"SPARQL vs estimated SQL baseline"
+2025-11-24T18:33:22.6226696,Baseline_Comparison,Large,1000,4308,451,451,441,465,200.67,"SPARQL vs estimated SQL baseline"
+2025-11-24T18:33:30.8078351,Baseline_Comparison,XLarge,10000,41508,1161,1161,1120,1240,200.00,"SPARQL vs estimated SQL baseline"
+2025-11-24T18:33:33.7218145,Data_Volume,Small,10,78,430,430,370,552,0.00,"2 warmup, 5 measurement runs"
+2025-11-24T18:33:36.5067387,Data_Volume,Medium,100,558,401,401,383,427,0.00,"2 warmup, 5 measurement runs"
+2025-11-24T18:33:39.6829534,Data_Volume,Large,1000,4308,456,456,420,515,0.00,"2 warmup, 5 measurement runs"
+2025-11-24T18:33:47.342965,Data_Volume,XLarge,10000,41508,1092,1092,1031,1135,0.00,"2 warmup, 5 measurement runs"

@@ -34,7 +34,6 @@ import java.util.concurrent.*;
  * - Test data must be populated using the SQL scripts in test-data/
  * - Both ecommerce_db (PostgreSQL) and health_research_center (MySQL) must be accessible
  *
- * @author Vijon Baraku
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest

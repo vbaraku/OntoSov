@@ -28,7 +28,7 @@ public class OntopService {
 
         try {
             properties.load(Files.newBufferedReader(propertiesPath));
-            log.info("Loaded {} properties", properties.size());
+//            log.info("Loaded {} properties", properties.size());
         } catch (Exception e) {
             log.error("Error loading database properties for controller: {}", controllerId, e);
             throw new RuntimeException("Error loading database properties for controller: " + controllerId, e);
@@ -96,7 +96,7 @@ public class OntopService {
                 try {
                     List<Map<String, String>> dbResults = future.get(30, TimeUnit.SECONDS);
                     for (Map<String, String> result : dbResults) {
-                        String uniqueKey = result.get("property") + "|" + result.get("value");
+                        String uniqueKey = result.get("entity") + "|" + result.get("property") + "|" + result.get("value");
                         if (!seenValues.contains(uniqueKey)) {
                             seenValues.add(uniqueKey);
                             mergedResults.add(result);
@@ -138,7 +138,7 @@ public class OntopService {
 
                 String parameterizedQuery = sparqlQuery.replace("?taxIdParam", "\"" + taxId + "\"");
 
-                log.info("Query: {}", parameterizedQuery);
+//                log.info("Query: {}", parameterizedQuery);
                 TupleQuery query = conn.prepareTupleQuery(parameterizedQuery);
 
                 try (TupleQueryResult rs = query.evaluate()) {
@@ -149,7 +149,7 @@ public class OntopService {
                                 bindingSet.getValue("parentEntity") == null ||
                                 bindingSet.getValue("property") == null ||
                                 bindingSet.getValue("value") == null) {
-                            log.warn("Skipping result with null values: {}", bindingSet);
+//                            log.warn("Skipping result with null values: {}", bindingSet);
                             continue;
                         }
 
@@ -160,9 +160,9 @@ public class OntopService {
                         resultRow.put("value", bindingSet.getValue("value").stringValue());
                         resultRow.put("source", config.name);
                         results.add(resultRow);
-                        log.info("Result row: {}", resultRow);
+//                        log.info("Result row: {}", resultRow);
                     }
-                    log.info("Results: {}", results);
+//                    log.info("Results: {}", results);
                 }
             }
         } catch (Exception e) {
