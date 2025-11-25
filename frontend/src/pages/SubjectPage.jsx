@@ -33,6 +33,7 @@ import {
   LinearProgress,
   Tabs,
   Tab,
+  TablePagination,
   tableCellClasses,
   styled,
   Snackbar
@@ -107,6 +108,8 @@ const SubjectPage = () => {
     severity: "info",
   });
   const [protectAllDialogOpen, setProtectAllDialogOpen] = useState(false);
+  const [sourcePages, setSourcePages] = useState({});
+  const [sourceRowsPerPage, setSourceRowsPerPage] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -567,6 +570,11 @@ const SubjectPage = () => {
       ...prev,
       [source]: term,
     }));
+    // Reset to first page when search changes
+    setSourcePages((prev) => ({
+      ...prev,
+      [source]: 0,
+    }));
   };
 
   const handleTabChange = (event, newValue) => {
@@ -577,6 +585,29 @@ const SubjectPage = () => {
     setFilterTabs((prev) => ({
       ...prev,
       [source]: tab,
+    }));
+    // Reset to first page when filter changes
+    setSourcePages((prev) => ({
+      ...prev,
+      [source]: 0,
+    }));
+  };
+
+  const handleSourcePageChange = (source, newPage) => {
+    setSourcePages((prev) => ({
+      ...prev,
+      [source]: newPage,
+    }));
+  };
+
+  const handleSourceRowsPerPageChange = (source, event) => {
+    setSourceRowsPerPage((prev) => ({
+      ...prev,
+      [source]: parseInt(event.target.value, 10),
+    }));
+    setSourcePages((prev) => ({
+      ...prev,
+      [source]: 0,
     }));
   };
 
@@ -1031,15 +1062,54 @@ const SubjectPage = () => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {renderSourceDataAsTable(
-                                source,
-                                sourceData,
-                                searchTerm,
-                                filterTab
-                              )}
+                              {(() => {
+                                // Get all rows (filtered by search and tab)
+                                const allRows = renderSourceDataAsTable(
+                                  source,
+                                  sourceData,
+                                  searchTerm,
+                                  filterTab
+                                );
+
+                                // Get pagination settings for this source
+                                const page = sourcePages[source] || 0;
+                                const rowsPerPage = sourceRowsPerPage[source] || 25;
+
+                                // If allRows is not an array, return it as-is (e.g., "No data" message)
+                                if (!Array.isArray(allRows)) {
+                                  return allRows;
+                                }
+
+                                // Slice rows for current page
+                                return allRows.slice(
+                                  page * rowsPerPage,
+                                  page * rowsPerPage + rowsPerPage
+                                );
+                              })()}
                             </TableBody>
                           </Table>
                         </TableContainer>
+                        <TablePagination
+                          component="div"
+                          count={(() => {
+                            const allRows = renderSourceDataAsTable(
+                              source,
+                              sourceData,
+                              searchTerm,
+                              filterTab
+                            );
+                            return Array.isArray(allRows) ? allRows.length : 0;
+                          })()}
+                          page={sourcePages[source] || 0}
+                          onPageChange={(event, newPage) =>
+                            handleSourcePageChange(source, newPage)
+                          }
+                          rowsPerPage={sourceRowsPerPage[source] || 25}
+                          onRowsPerPageChange={(event) =>
+                            handleSourceRowsPerPageChange(source, event)
+                          }
+                          rowsPerPageOptions={[10, 25, 50, 100]}
+                        />
                       </CardContent>
                     </Card>
                   </Grid>
