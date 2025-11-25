@@ -222,21 +222,21 @@ class PolicyPerformanceTest {
         @Order(1)
         @DisplayName("Page Load - 0 policies (baseline)")
         void testPageLoadWithPolicies_0() {
-            testPageLoadWithPolicies(0, "0_Policies", TAX_ID_XLARGE);
+            testPageLoadWithPolicies(0, "0_Policies", TAX_ID_SMALL);
         }
 
         @Test
         @Order(2)
         @DisplayName("Page Load - 100 policies")
         void testPageLoadWithPolicies_100() {
-            testPageLoadWithPolicies(100, "100_Policies", TAX_ID_XLARGE);
+            testPageLoadWithPolicies(100, "100_Policies", TAX_ID_MEDIUM);
         }
 
         @Test
         @Order(3)
         @DisplayName("Page Load - 1,000 policies")
         void testPageLoadWithPolicies_1000() {
-            testPageLoadWithPolicies(1000, "1000_Policies", TAX_ID_XLARGE);
+            testPageLoadWithPolicies(1000, "1000_Policies", TAX_ID_LARGE);
         }
 
         @Test
