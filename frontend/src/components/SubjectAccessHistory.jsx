@@ -26,6 +26,7 @@ import {
   DialogActions,
   Button,
   Stack,
+  TablePagination,
   tableCellClasses,
   styled,
 } from "@mui/material";
@@ -78,6 +79,8 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
   const [batchVerifying, setBatchVerifying] = useState(false);
   const [blockchainStatus, setBlockchainStatus] = useState(null);
   const [expandedDetails, setExpandedDetails] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
     if (subjectId) {
@@ -377,7 +380,10 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
           <TextField
             placeholder="Search controller, purpose, or data..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(0); // Reset to first page when search changes
+            }}
             size="small"
             sx={{ flexGrow: 1 }}
             InputProps={{
@@ -392,7 +398,10 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             select
             label="Decision"
             value={filterDecision}
-            onChange={(e) => setFilterDecision(e.target.value)}
+            onChange={(e) => {
+              setFilterDecision(e.target.value);
+              setPage(0); // Reset to first page when filter changes
+            }}
             size="small"
             sx={{ minWidth: 120 }}
           >
@@ -404,7 +413,10 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
             select
             label="Action"
             value={filterAction}
-            onChange={(e) => setFilterAction(e.target.value)}
+            onChange={(e) => {
+              setFilterAction(e.target.value);
+              setPage(0); // Reset to first page when filter changes
+            }}
             size="small"
             sx={{ minWidth: 120 }}
           >
@@ -444,7 +456,9 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredLogs.map((log) => (
+              filteredLogs
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((log) => (
                 <StyledTableRow key={log.id} onClick={() => handleRowClick(log)}>
                   <TableCell>
                     {new Date(log.requestTime).toLocaleString()}
@@ -538,6 +552,18 @@ const SubjectAccessHistory = ({ subjectId, controllers }) => {
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        component="div"
+        count={filteredLogs.length}
+        page={page}
+        onPageChange={(event, newPage) => setPage(newPage)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+      />
 
       {/* Details Dialog */}
       <Dialog

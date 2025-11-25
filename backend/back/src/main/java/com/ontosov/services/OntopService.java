@@ -96,7 +96,7 @@ public class OntopService {
                 try {
                     List<Map<String, String>> dbResults = future.get(30, TimeUnit.SECONDS);
                     for (Map<String, String> result : dbResults) {
-                        String uniqueKey = result.get("property") + "|" + result.get("value");
+                        String uniqueKey = result.get("entity") + "|" + result.get("property") + "|" + result.get("value");
                         if (!seenValues.contains(uniqueKey)) {
                             seenValues.add(uniqueKey);
                             mergedResults.add(result);
