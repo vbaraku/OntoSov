@@ -1,0 +1,26 @@
+timestamp,test_type,scale,num_operations,duration_ms,ops_per_sec,avg_gas_used,total_gas,metric,notes
+2025-12-03T12:04:35.2021393,verification,policy_hash,1,0,0.00,N/A,N/A,PASS,Policy hash verification
+2025-12-03T12:04:35.4488452,verification,access_log,1,0,0.00,N/A,N/A,PASS,Access log field verification
+2025-12-03T12:04:35.8446565,verification,version_increment,3,0,0.00,N/A,N/A,PASS,Policy version increment verification
+2025-12-03T12:04:37.1115763,gas_analysis,policy_registration,10,0,0.00,118325,1183258,gas_cost,Min: 118315, Max: 118327
+2025-12-03T12:04:38.5974938,gas_analysis,access_logging,10,0,0.00,256308,2563082,gas_cost,Min: 246315, Max: 266311
+2025-12-03T12:04:38.7586962,gas_analysis,content_size_100,1,0,0.00,118279,118279,gas_cost,Policy content size: 100 chars
+2025-12-03T12:04:38.870873,gas_analysis,content_size_500,1,0,0.00,118279,118279,gas_cost,Policy content size: 500 chars
+2025-12-03T12:04:38.963484,gas_analysis,content_size_1000,1,0,0.00,118291,118291,gas_cost,Policy content size: 1000 chars
+2025-12-03T12:04:39.0500365,gas_analysis,content_size_2000,1,0,0.00,118291,118291,gas_cost,Policy content size: 2000 chars
+2025-12-03T12:04:39.1698971,gas_analysis,content_size_5000,1,0,0.00,118291,118291,gas_cost,Policy content size: 5000 chars
+2025-12-03T12:04:50.3530203,log_retrieval,single,1,37,27.03,N/A,N/A,read_only,Single log retrieval by index
+2025-12-03T12:04:52.5425893,log_retrieval,10_logs,10,358,27.88,N/A,N/A,read_only,10 sequential log retrievals
+2025-12-03T12:05:04.2985992,log_retrieval,50_logs,50,1969,25.39,N/A,N/A,read_only,50 sequential log retrievals
+2025-12-03T12:05:27.6948912,log_retrieval,100_logs,100,4162,24.02,N/A,N/A,read_only,100 sequential log retrievals
+2025-12-03T12:05:28.1506741,policy_version,single,1,37,27.03,N/A,N/A,read_only,Policy version lookup
+2025-12-03T12:05:28.9461024,access_logging,single_permit,1,135,7.37,266191,266191,baseline,Single PERMIT log entry
+2025-12-03T12:05:29.722802,access_logging,single_deny,1,124,8.02,246279,246279,baseline,Single DENY log entry
+2025-12-03T12:05:34.2069034,access_logging,10_entries,10,1479,6.76,258826,2588262,batch,10 mixed access log entries
+2025-12-03T12:05:57.4638032,access_logging,50_entries,50,7738,6.46,259460,12973002,batch,50 mixed access log entries
+2025-12-03T12:06:42.2699384,access_logging,100_entries,100,14921,6.70,259461,25946112,batch,100 mixed access log entries
+2025-12-03T12:10:19.2947604,access_logging,500_entries,500,72330,6.91,259591,129795576,batch,500 mixed access log entries
+2025-12-03T12:10:19.7982059,policy_registration,single,1,71,13.95,118786,118786,baseline,Single policy hash + record
+2025-12-03T12:10:24.3882483,policy_registration,10_policies,10,1405,7.12,118796,1187960,batch,10 sequential policy registrations
+2025-12-03T12:10:41.9758183,policy_registration,50_policies,50,5730,8.72,118796,5939840,batch,50 sequential policy registrations
+2025-12-03T12:11:15.7065653,policy_registration,100_policies,100,11099,9.01,118796,11879616,batch,100 sequential policy registrations

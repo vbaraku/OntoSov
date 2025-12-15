@@ -19,6 +19,7 @@ import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.TransactionManager;
 import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.abi.datatypes.generated.Uint8;
 
 import jakarta.annotation.PostConstruct;
 
@@ -261,6 +262,179 @@ public class BlockchainService {
             return digest.digest(input.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             return new byte[32]; // Return empty bytes if error
+        }
+    }
+
+    /**
+     * Result class for retrieved access logs
+     */
+    public static class AccessLogData {
+        private final String controller;
+        private final String subject;
+        private final String action;
+        private final boolean permitted;
+        private final String policyGroupId;
+        private final BigInteger policyVersion;
+        private final BigInteger timestamp;
+
+        public AccessLogData(String controller, String subject, String action,
+                             boolean permitted, String policyGroupId,
+                             BigInteger policyVersion, BigInteger timestamp) {
+            this.controller = controller;
+            this.subject = subject;
+            this.action = action;
+            this.permitted = permitted;
+            this.policyGroupId = policyGroupId;
+            this.policyVersion = policyVersion;
+            this.timestamp = timestamp;
+        }
+
+        public String getController() { return controller; }
+        public String getSubject() { return subject; }
+        public String getAction() { return action; }
+        public boolean isPermitted() { return permitted; }
+        public String getPolicyGroupId() { return policyGroupId; }
+        public BigInteger getPolicyVersion() { return policyVersion; }
+        public BigInteger getTimestamp() { return timestamp; }
+    }
+
+    /**
+     * Retrieve an access log entry by index from the blockchain
+     */
+    public AccessLogData getAccessLog(Long logIndex) {
+        try {
+            Function function = new Function(
+                    "getLog",
+                    Collections.singletonList(new Uint256(logIndex)),
+                    Arrays.asList(
+                            new TypeReference<Address>() {},    // controller
+                            new TypeReference<Address>() {},    // subject
+                            new TypeReference<Bytes32>() {},    // purposeHash
+                            new TypeReference<Utf8String>() {}, // action
+                            new TypeReference<Bool>() {},       // permitted
+                            new TypeReference<Utf8String>() {}, // policyGroupId
+                            new TypeReference<Uint256>() {},    // policyVersion
+                            new TypeReference<Uint256>() {}     // timestamp
+                    )
+            );
+
+            String encodedFunction = FunctionEncoder.encode(function);
+
+            EthCall response = web3j.ethCall(
+                    Transaction.createEthCallTransaction(
+                            credentials.getAddress(),
+                            ACCESS_LOGGER_ADDRESS,
+                            encodedFunction
+                    ),
+                    DefaultBlockParameterName.LATEST
+            ).send();
+
+            List<Type> results = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+
+            if (results.size() >= 8) {
+                return new AccessLogData(
+                        ((Address) results.get(0)).getValue(),
+                        ((Address) results.get(1)).getValue(),
+                        ((Utf8String) results.get(3)).getValue(),
+                        ((Bool) results.get(4)).getValue(),
+                        ((Utf8String) results.get(5)).getValue(),
+                        ((Uint256) results.get(6)).getValue(),
+                        ((Uint256) results.get(7)).getValue()
+                );
+            }
+
+            return null;
+        } catch (Exception e) {
+            System.err.println("Error retrieving access log: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get the current version number for a policy from the blockchain
+     */
+    public BigInteger getPolicyVersion(String subjectAddress, String policyGroupId) {
+        try {
+            Function function = new Function(
+                    "getCurrentVersion",
+                    Arrays.asList(
+                            new Address(subjectAddress),
+                            new Utf8String(policyGroupId)
+                    ),
+                    Collections.singletonList(new TypeReference<Uint256>() {})
+            );
+
+            String encodedFunction = FunctionEncoder.encode(function);
+
+            EthCall response = web3j.ethCall(
+                    Transaction.createEthCallTransaction(
+                            credentials.getAddress(),
+                            POLICY_REGISTRY_ADDRESS,
+                            encodedFunction
+                    ),
+                    DefaultBlockParameterName.LATEST
+            ).send();
+
+            List<Type> results = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+
+            if (!results.isEmpty()) {
+                return ((Uint256) results.get(0)).getValue();
+            }
+
+            return BigInteger.ZERO;
+        } catch (Exception e) {
+            System.err.println("Error getting policy version: " + e.getMessage());
+            return BigInteger.ZERO;
+        }
+    }
+
+    /**
+     * Get the stored policy hash from the blockchain
+     */
+    public byte[] getPolicyHash(String subjectAddress, String policyGroupId) {
+        try {
+            // First get current version
+            BigInteger version = getPolicyVersion(subjectAddress, policyGroupId);
+            if (version.equals(BigInteger.ZERO)) {
+                return null;
+            }
+
+            Function function = new Function(
+                    "getPolicy",
+                    Arrays.asList(
+                            new Address(subjectAddress),
+                            new Utf8String(policyGroupId),
+                            new Uint256(version)
+                    ),
+                    Arrays.asList(
+                            new TypeReference<Bytes32>() {},  // policyHash
+                            new TypeReference<Uint256>() {},  // versionNumber
+                            new TypeReference<Uint256>() {},  // timestamp
+                            new TypeReference<Uint8>() {}     // status (enum)
+                    )
+            );
+
+            String encodedFunction = FunctionEncoder.encode(function);
+
+            EthCall response = web3j.ethCall(
+                    Transaction.createEthCallTransaction(
+                            credentials.getAddress(),
+                            POLICY_REGISTRY_ADDRESS,
+                            encodedFunction
+                    ),
+                    DefaultBlockParameterName.LATEST
+            ).send();
+
+            List<Type> results = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+
+            if (!results.isEmpty()) {
+                return ((Bytes32) results.get(0)).getValue();
+            }
+
+            return null;
+        } catch (Exception e) {
+            System.err.println("Error getting policy hash: " + e.getMessage());
+            return null;
         }
     }
 
