@@ -8,6 +8,7 @@ import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.PreDestroy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,128 @@ public class OntopService {
     private static final String ONTOP_DIR = "src/main/resources/ontop/controllers/";
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
+    // ============== NEW: CACHING LAYER ==============
+    // Cache for database configurations per controller (controllerId -> configs)
+    private final ConcurrentHashMap<Long, Map<String, DatabaseConfig>> controllerConfigCache = new ConcurrentHashMap<>();
+
+    // Cache for OBDA file paths per controller (controllerId -> list of OBDA paths)
+    private final ConcurrentHashMap<Long, List<Path>> obdaFilesCache = new ConcurrentHashMap<>();
+
+    // Cache for OntopRepository instances (cacheKey -> repository)
+    // Key format: "controllerId_databaseName"
+    private final ConcurrentHashMap<String, OntopRepository> repositoryCache = new ConcurrentHashMap<>();
+    // ================================================
+
+    // ============== NEW: CACHE INVALIDATION ==============
+
+    /**
+     * Invalidates all caches for a specific controller.
+     * Call this when database configs or OBDA mappings change.
+     */
+    public void invalidateControllerCache(Long controllerId) {
+        log.info("Invalidating cache for controller: {}", controllerId);
+
+        // Remove config cache
+        controllerConfigCache.remove(controllerId);
+
+        // Remove OBDA files cache
+        obdaFilesCache.remove(controllerId);
+
+        // Remove all repository caches for this controller
+        String prefix = controllerId + "_";
+        repositoryCache.entrySet().removeIf(entry -> {
+            if (entry.getKey().startsWith(prefix)) {
+                try {
+                    entry.getValue().shutDown();
+                } catch (Exception e) {
+                    log.warn("Error shutting down cached repository: {}", e.getMessage());
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Invalidates all caches. Use sparingly.
+     */
+    public void invalidateAllCaches() {
+        log.info("Invalidating all caches");
+        controllerConfigCache.clear();
+        obdaFilesCache.clear();
+
+        // Shutdown all cached repositories
+        repositoryCache.forEach((key, repo) -> {
+            try {
+                repo.shutDown();
+            } catch (Exception e) {
+                log.warn("Error shutting down cached repository {}: {}", key, e.getMessage());
+            }
+        });
+        repositoryCache.clear();
+    }
+
+    /**
+     * Cleanup on service shutdown
+     */
+    @PreDestroy
+    public void cleanup() {
+        log.info("Shutting down OntopService, cleaning up cached repositories");
+        invalidateAllCaches();
+        executorService.shutdown();
+    }
+    // =====================================================
+
+    // MODIFIED: Now uses cache
+    private Map<String, DatabaseConfig> getDatabaseConfigs(Long controllerId) {
+        return controllerConfigCache.computeIfAbsent(controllerId, id -> {
+            log.info("Cache MISS for controller {} configs - loading from file", id);
+            Properties properties = loadDatabaseProperties(id);
+            return parseDatabaseConfigs(properties);
+        });
+    }
+
+    // MODIFIED: Now uses cache
+    private List<Path> getObdaFiles(Long controllerId) {
+        return obdaFilesCache.computeIfAbsent(controllerId, id -> {
+            log.info("Cache MISS for controller {} OBDA files - scanning directory", id);
+            try {
+                Path controllerDir = Paths.get(ONTOP_DIR, id.toString());
+                return Files.list(controllerDir)
+                        .filter(path -> path.toString().endsWith(".obda"))
+                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                log.error("Error listing OBDA files for controller: {}", id, e);
+                return Collections.emptyList();
+            }
+        });
+    }
+
+    // MODIFIED: Now uses cached repository
+    private OntopRepository getOrCreateRepository(String cacheKey, DatabaseConfig config, Path obdaPath) {
+        return repositoryCache.computeIfAbsent(cacheKey, key -> {
+            log.info("Cache MISS for repository {} - creating new instance", key);
+            try {
+                String mappingPath = obdaPath.toUri().toString();
+                OntopSQLOWLAPIConfiguration ontopConfig = OntopSQLOWLAPIConfiguration.defaultBuilder()
+                        .nativeOntopMappingFile(mappingPath)
+                        .jdbcUrl(config.jdbcUrl)
+                        .jdbcUser(config.username)
+                        .jdbcPassword(config.password)
+                        .enableTestMode()
+                        .build();
+
+                OntopRepository repository = OntopRepository.defaultRepository(ontopConfig);
+                repository.init();  // Initialize the repository
+                return repository;
+            } catch (Exception e) {
+                log.error("Error creating OntopRepository for {}: {}", key, e.getMessage());
+                throw new RuntimeException("Failed to create OntopRepository", e);
+            }
+        });
+    }
+
+    // UNCHANGED: Original method preserved
     private Properties loadDatabaseProperties(Long controllerId) {
         Properties properties = new Properties();
         Path propertiesPath = Paths.get(ONTOP_DIR, controllerId.toString(), "database_configs.properties");
@@ -37,6 +160,7 @@ public class OntopService {
         return properties;
     }
 
+    // UNCHANGED: Original method preserved
     private Map<String, DatabaseConfig> parseDatabaseConfigs(Properties properties) {
         Map<String, DatabaseConfig> configs = new HashMap<>();
 
@@ -67,15 +191,12 @@ public class OntopService {
         return configs;
     }
 
+    // MODIFIED: Uses cached configs, OBDA files, and repositories
     public List<Map<String, String>> executeQuery(Long controllerId, String taxId, String sparqlQuery) {
         try {
-            Properties properties = loadDatabaseProperties(controllerId);
-            Map<String, DatabaseConfig> dbConfigs = parseDatabaseConfigs(properties);
-
-            Path controllerDir = Paths.get(ONTOP_DIR, controllerId.toString());
-            List<Path> obdaFiles = Files.list(controllerDir)
-                    .filter(path -> path.toString().endsWith(".obda"))
-                    .collect(Collectors.toList());
+            // USE CACHE instead of loading every time
+            Map<String, DatabaseConfig> dbConfigs = getDatabaseConfigs(controllerId);
+            List<Path> obdaFiles = getObdaFiles(controllerId);
 
             List<Future<List<Map<String, String>>>> futures = new ArrayList<>();
 
@@ -85,7 +206,7 @@ public class OntopService {
 
                 if (dbConfig != null) {
                     futures.add(executorService.submit(() ->
-                            queryDatabase(dbConfig, obdaPath, sparqlQuery, taxId)));
+                            queryDatabase(controllerId, dbConfig, obdaPath, sparqlQuery, taxId)));
                 }
             }
 
@@ -115,27 +236,22 @@ public class OntopService {
         }
     }
 
+    // MODIFIED: Uses cached repository instead of creating new one each time
     private List<Map<String, String>> queryDatabase(
+            Long controllerId,  // ADD: Need controllerId for cache key
             DatabaseConfig config,
             Path obdaPath,
             String sparqlQuery,
             String taxId) {
 
         List<Map<String, String>> results = new ArrayList<>();
-        String mappingPath = obdaPath.toUri().toString();
+        String cacheKey = controllerId + "_" + config.name;
 
         try {
-            OntopSQLOWLAPIConfiguration ontopConfig = OntopSQLOWLAPIConfiguration.defaultBuilder()
-                    .nativeOntopMappingFile(mappingPath)
-                    .jdbcUrl(config.jdbcUrl)
-                    .jdbcUser(config.username)
-                    .jdbcPassword(config.password)
-                    .enableTestMode()
-                    .build();
+            // USE CACHED REPOSITORY instead of creating new one
+            OntopRepository repository = getOrCreateRepository(cacheKey, config, obdaPath);
 
-            try (OntopRepository repository = OntopRepository.defaultRepository(ontopConfig);
-                 RepositoryConnection conn = repository.getConnection()) {
-
+            try (RepositoryConnection conn = repository.getConnection()) {
                 String parameterizedQuery = sparqlQuery.replace("?taxIdParam", "\"" + taxId + "\"");
 
                 log.info("Query: {}", parameterizedQuery);
@@ -167,16 +283,20 @@ public class OntopService {
             }
         } catch (Exception e) {
             log.error("Error querying database: {}", config.name, e);
+            // If repository fails, remove from cache and let next call recreate it
+            repositoryCache.remove(cacheKey);
         }
 
         return results;
     }
 
+    // UNCHANGED: Original method preserved
     private String extractDatabaseName(Path obdaPath) {
         String filename = obdaPath.getFileName().toString();
         return filename.substring(filename.indexOf("_") + 1, filename.lastIndexOf("_"));
     }
 
+    // UNCHANGED: Original method preserved
     private DatabaseConfig findDatabaseConfig(Map<String, DatabaseConfig> configs, String dbName) {
         return configs.values().stream()
                 .filter(config -> config.name.equalsIgnoreCase(dbName))
@@ -184,16 +304,17 @@ public class OntopService {
                 .orElse(null);
     }
 
+    // UNCHANGED: Original method preserved
     public String getPersonDataQuery() {
         return """
                 PREFIX schema: <http://schema.org/>
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
+                
                 SELECT ?entity ?parentEntity ?property ?value
                 WHERE {
                     ?person a schema:Person ;
                             schema:taxID ?taxIdParam .
-                    
+                
                     {
                         # Direct person properties - simplified binding
                         ?person ?property ?value .
@@ -223,6 +344,7 @@ public class OntopService {
                 """;
     }
 
+    // UNCHANGED: Original class preserved
     private static class DatabaseConfig {
         String name;
         String type;
