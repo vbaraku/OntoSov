@@ -2,6 +2,7 @@ package com.ontosov.services;
 
 import com.ontosov.dto.*;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -18,6 +19,9 @@ import java.util.stream.Collectors;
 @Service
 public class DatabaseConfigService {
     private static final String ONTOP_DIR = "src/main/resources/ontop/controllers/";
+
+    @Autowired
+    private OntopService ontopService;
 
     private String getControllerDir(Long controllerId) {
         return ONTOP_DIR + controllerId + "/";
@@ -67,6 +71,7 @@ public class DatabaseConfigService {
 
         // Set the ID in the DTO for reference
         configDTO.setId(dbId);
+        ontopService.invalidateControllerCache(controllerId);
     }
 
     private String findExistingDatabaseId(Properties properties, DatabaseConfigDTO newConfig) {
@@ -149,6 +154,7 @@ public class DatabaseConfigService {
         String obdaPath = getObdaPath(controllerId, databaseName);
         Files.createDirectories(Paths.get(obdaPath).getParent());
         Files.writeString(Paths.get(obdaPath), obdaContent.toString());
+        ontopService.invalidateControllerCache(controllerId);
     }
 
     private void generateEntityMapping(StringBuilder obdaContent, String tableName, String primaryKey, String schemaClass, List<SchemaMappingDTO> mappings) {
@@ -527,5 +533,6 @@ public class DatabaseConfigService {
                 properties.store(writer, "Database configurations for controller " + controllerId);
             }
         }
+        ontopService.invalidateControllerCache(controllerId);
     }
 }

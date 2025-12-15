@@ -50,6 +50,12 @@ public class PolicyGroupService {
     // Transformation properties (ODS)
     private final Property transformationsProperty;
 
+    private final Property hasDataAssignmentProperty;
+    private final Property dataSourcePropertyCached;
+    private final Property dataPropertyPropertyCached;
+    private final Property entityIdPropertyCached;
+    private final Property assignmentTypeProperty;
+
     @Autowired
     private ODRLService odrlService;
     @Autowired
@@ -91,6 +97,12 @@ public class PolicyGroupService {
 
         // Define transformation properties
         this.transformationsProperty = policyModel.createProperty(ONTOSOV_NS, "transformations");
+
+        this.hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
+        this.dataSourcePropertyCached = policyModel.createProperty(ONTOSOV_NS, "dataSource");
+        this.dataPropertyPropertyCached = policyModel.createProperty(ONTOSOV_NS, "dataProperty");
+        this.entityIdPropertyCached = policyModel.createProperty(ONTOSOV_NS, "entityId");
+        this.assignmentTypeProperty = policyModel.createProperty(ONTOSOV_NS, "assignmentType");
     }
 
     public String createPolicyGroup(PolicyGroupDTO policyGroupDTO, Long subjectId) {
@@ -551,7 +563,6 @@ public class PolicyGroupService {
             odrlService.cleanupPoliciesForGroupInTransaction(groupId, subjectId);
 
             // Remove all data assignments for this group
-            Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
             StmtIterator assignmentIterator = policyModel.listStatements(policyGroup, hasDataAssignmentProperty, (RDFNode) null);
             while (assignmentIterator.hasNext()) {
                 Statement stmt = assignmentIterator.next();
@@ -596,7 +607,6 @@ public class PolicyGroupService {
             }
 
             // Clear previous data assignments for this group
-            Property hasDataAssignmentProperty = policyModel.createProperty(ONTOSOV_NS, "hasDataAssignment");
             policyGroupResource.removeAll(hasDataAssignmentProperty);
 
             // Create new property assignments
@@ -607,9 +617,9 @@ public class PolicyGroupService {
 
                     for (String property : properties) {
                         Resource dataAssignment = policyModel.createResource();
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataProperty"), property);
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "property");
+                        dataAssignment.addProperty(dataSourcePropertyCached, dataSource);
+                        dataAssignment.addProperty(dataPropertyPropertyCached, property);
+                        dataAssignment.addProperty(assignmentTypeProperty, "property");
                         policyGroupResource.addProperty(hasDataAssignmentProperty, dataAssignment);
                     }
                 }
@@ -623,9 +633,9 @@ public class PolicyGroupService {
 
                     for (String entityId : entityIds) {
                         Resource dataAssignment = policyModel.createResource();
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "dataSource"), dataSource);
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "entityId"), entityId);
-                        dataAssignment.addProperty(policyModel.createProperty(ONTOSOV_NS, "assignmentType"), "entity");
+                        dataAssignment.addProperty(dataSourcePropertyCached, dataSource);
+                        dataAssignment.addProperty(entityIdPropertyCached, entityId);
+                        dataAssignment.addProperty(assignmentTypeProperty, "entity");
                         policyGroupResource.addProperty(hasDataAssignmentProperty, dataAssignment);
                     }
                 }

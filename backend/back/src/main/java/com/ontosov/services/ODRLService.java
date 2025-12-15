@@ -80,6 +80,21 @@ public class ODRLService {
     // DPV purpose property (OAC vocabulary)
     private final Property oacPurposeProperty;
 
+    private final Resource readAction;
+    private final Resource useAction;
+    private final Resource shareAction;
+    private final Resource aggregateAction;
+    private final Resource modifyAction;
+    private final Resource allControllersResource;
+    private final Property odrlPermissionProperty;
+    private final Property odrlProhibitionProperty;
+    private final Property odrlDutyProperty;
+    private final Property entityTypeProperty;
+    private final Property entityIdProperty;
+
+    private final Resource isAOperator;
+    private final Resource eqOperator;
+
     public ODRLService() {
         // Initialize dataset and model
         String triplestorePath = "src/main/resources/triplestore";
@@ -132,6 +147,42 @@ public class ODRLService {
 
         // Initialize DPV purpose property (OAC vocabulary)
         this.oacPurposeProperty = odrlModel.createProperty(OAC_NS, "Purpose");
+
+        // Action resources
+        this.readAction = odrlModel.createResource(ODRL_NS + "read");
+        this.useAction = odrlModel.createResource(ODRL_NS + "use");
+        this.shareAction = odrlModel.createResource(ODRL_NS + "share");
+        this.aggregateAction = odrlModel.createResource(ODRL_NS + "aggregate");
+        this.modifyAction = odrlModel.createResource(ODRL_NS + "modify");
+
+        // Common resources
+        this.allControllersResource = odrlModel.createResource(ONTOSOV_NS + "allControllers");
+
+        // ODRL properties
+        this.odrlPermissionProperty = odrlModel.createProperty(ODRL_NS, "permission");
+        this.odrlProhibitionProperty = odrlModel.createProperty(ODRL_NS, "prohibition");
+        this.odrlDutyProperty = odrlModel.createProperty(ODRL_NS, "duty");
+        this.entityTypeProperty = odrlModel.createProperty(ONTOSOV_NS, "entityType");
+        this.entityIdProperty = odrlModel.createProperty(ONTOSOV_NS, "entityId");
+
+        // Operator resources
+        this.isAOperator = odrlModel.createResource(ODRL_NS + "isA");
+        this.eqOperator = odrlModel.createResource(ODRL_NS + "eq");
+    }
+
+    /**
+     * Returns cached action resource for performance.
+     * Avoids creating new Resource objects for every policy.
+     */
+    private Resource getCachedActionResource(String action) {
+        return switch (action) {
+            case "read" -> readAction;
+            case "use" -> useAction;
+            case "share" -> shareAction;
+            case "aggregate" -> aggregateAction;
+            case "modify" -> modifyAction;
+            default -> odrlModel.createResource(ODRL_NS + action);
+        };
     }
 
     public void generatePoliciesFromAssignment(String policyGroupId, PolicyGroupDTO policyGroup,
@@ -238,13 +289,13 @@ public class ODRLService {
         permission.addProperty(targetProperty, target);
 
         // Set action
-        permission.addProperty(actionProperty, odrlModel.createResource(ODRL_NS + action));
+        permission.addProperty(actionProperty, getCachedActionResource(action));
 
         // Set assigner (the subject)
         permission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
 
         // Set assignee (all controllers by default - can be refined later)
-        permission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+        permission.addProperty(assigneeProperty, allControllersResource);
 
         // Add constraints if present
         if (constraints != null && !constraints.isEmpty()) {
@@ -267,7 +318,7 @@ public class ODRLService {
                 Resource purposeConstraint = odrlModel.createResource();
                 purposeConstraint.addProperty(RDF.type, constraintResource);
                 purposeConstraint.addProperty(leftOperandProperty, oacPurposeProperty);
-                purposeConstraint.addProperty(operatorProperty, odrlModel.createResource(ODRL_NS + "isA"));
+                purposeConstraint.addProperty(operatorProperty, isAOperator);
                 purposeConstraint.addProperty(rightOperandProperty, odrlModel.createResource(purposeUri));
 
                 permission.addProperty(constraintProperty, purposeConstraint);
@@ -357,13 +408,13 @@ public class ODRLService {
 
                 if (transformationAction != null) {
                     transformationDuty.addProperty(actionProperty, transformationAction);
-                    permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), transformationDuty);
+                    permission.addProperty(odrlDutyProperty, transformationDuty);
                 }
             }
         }
 
         // Add permission to policy
-        policy.addProperty(odrlModel.createProperty(ODRL_NS, "permission"), permission);
+        policy.addProperty(odrlPermissionProperty, permission);
 
         // Handle AI training restrictions
         if (aiRestrictions != null) {
@@ -382,17 +433,16 @@ public class ODRLService {
                 prohibition.addProperty(actionProperty, aiTrainingAction);
                 prohibition.addProperty(assignerProperty,
                         odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
-                prohibition.addProperty(assigneeProperty,
-                        odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+                prohibition.addProperty(assigneeProperty, allControllersResource);
 
                 // Add prohibition to policy
-                policy.addProperty(odrlModel.createProperty(ODRL_NS, "prohibition"), prohibition);
+                policy.addProperty(odrlProhibitionProperty, prohibition);
             } else if (aiAlgorithm != null && !aiAlgorithm.isEmpty()) {
                 // Create permission with constraint for specific AI algorithm
                 Resource aiConstraint = odrlModel.createResource();
                 aiConstraint.addProperty(RDF.type, constraintResource);
                 aiConstraint.addProperty(leftOperandProperty, aiAlgorithmProperty);
-                aiConstraint.addProperty(operatorProperty, odrlModel.createResource(ODRL_NS + "eq"));
+                aiConstraint.addProperty(operatorProperty, eqOperator);
                 aiConstraint.addProperty(rightOperandProperty, aiAlgorithm);
 
                 Resource aiPermission = odrlModel.createResource();
@@ -402,8 +452,7 @@ public class ODRLService {
                 aiPermission.addProperty(constraintProperty, aiConstraint);
                 aiPermission.addProperty(assignerProperty,
                         odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
-                aiPermission.addProperty(assigneeProperty,
-                        odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+                aiPermission.addProperty(assigneeProperty, allControllersResource);
 
                 // Add permission to policy
                 policy.addProperty(odrlModel.createProperty(ODRL_NS, "permission"), aiPermission);
@@ -433,18 +482,17 @@ public class ODRLService {
 
         // Add metadata to the target
         target.addProperty(dataSourceProperty, dataSource);
-        target.addProperty(odrlModel.createProperty(ONTOSOV_NS, "entityType"), entityType);
-        target.addProperty(odrlModel.createProperty(ONTOSOV_NS, "entityId"), entityId);
+        target.addProperty(entityTypeProperty, entityType);
+        target.addProperty(entityIdProperty, entityId);
 
         permission.addProperty(targetProperty, target);
 
         // Set action
-        Resource actionResource = odrlModel.createResource(ODRL_NS + action);
-        permission.addProperty(actionProperty, actionResource);
+        permission.addProperty(actionProperty, getCachedActionResource(action));
 
         // Set assigner and assignee
         permission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
-        permission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+        permission.addProperty(assigneeProperty, allControllersResource);
 
         // Add constraints if they exist
         if (constraints != null && !constraints.isEmpty()) {
@@ -467,7 +515,7 @@ public class ODRLService {
                 Resource purposeConstraint = odrlModel.createResource();
                 purposeConstraint.addProperty(RDF.type, constraintResource);
                 purposeConstraint.addProperty(leftOperandProperty, oacPurposeProperty);
-                purposeConstraint.addProperty(operatorProperty, odrlModel.createResource(ODRL_NS + "isA"));
+                purposeConstraint.addProperty(operatorProperty, isAOperator);
                 purposeConstraint.addProperty(rightOperandProperty, odrlModel.createResource(purposeUri));
 
                 permission.addProperty(constraintProperty, purposeConstraint);
@@ -532,13 +580,13 @@ public class ODRLService {
 
                 if (transformationAction != null) {
                     transformationDuty.addProperty(actionProperty, transformationAction);
-                    permission.addProperty(odrlModel.createProperty(ODRL_NS, "duty"), transformationDuty);
+                    permission.addProperty(odrlDutyProperty, transformationDuty);
                 }
             }
         }
 
         // Add the permission to the policy
-        policy.addProperty(odrlModel.createProperty(ODRL_NS, "permission"), permission);
+        policy.addProperty(odrlPermissionProperty, permission);
 
         // Handle AI restrictions (inline logic)
         if (aiRestrictions != null && !aiRestrictions.isEmpty()) {
@@ -554,9 +602,9 @@ public class ODRLService {
                 prohibition.addProperty(targetProperty, target);
                 prohibition.addProperty(actionProperty, aiTrainingAction);
                 prohibition.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
-                prohibition.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+                prohibition.addProperty(assigneeProperty, allControllersResource);
 
-                policy.addProperty(odrlModel.createProperty(ODRL_NS, "prohibition"), prohibition);
+                policy.addProperty(odrlProhibitionProperty, prohibition);
             } else if (aiRestrictions.containsKey("aiAlgorithm") &&
                     !aiRestrictions.get("aiAlgorithm").toString().isEmpty()) {
                 // Create permission with algorithm constraint
@@ -565,7 +613,7 @@ public class ODRLService {
                 aiPermission.addProperty(targetProperty, target);
                 aiPermission.addProperty(actionProperty, aiTrainingAction);
                 aiPermission.addProperty(assignerProperty, odrlModel.createResource(ONTOSOV_NS + "subject-" + subjectId));
-                aiPermission.addProperty(assigneeProperty, odrlModel.createResource(ONTOSOV_NS + "allControllers"));
+                aiPermission.addProperty(assigneeProperty, allControllersResource);
 
                 // Add algorithm constraint
                 Resource algorithmConstraint = odrlModel.createResource();
