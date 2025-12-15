@@ -23,7 +23,6 @@ public class OntopService {
     private static final String ONTOP_DIR = "src/main/resources/ontop/controllers/";
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
-    // ============== NEW: CACHING LAYER ==============
     // Cache for database configurations per controller (controllerId -> configs)
     private final ConcurrentHashMap<Long, Map<String, DatabaseConfig>> controllerConfigCache = new ConcurrentHashMap<>();
 
@@ -33,9 +32,6 @@ public class OntopService {
     // Cache for OntopRepository instances (cacheKey -> repository)
     // Key format: "controllerId_databaseName"
     private final ConcurrentHashMap<String, OntopRepository> repositoryCache = new ConcurrentHashMap<>();
-    // ================================================
-
-    // ============== NEW: CACHE INVALIDATION ==============
 
     /**
      * Invalidates all caches for a specific controller.
@@ -93,9 +89,7 @@ public class OntopService {
         invalidateAllCaches();
         executorService.shutdown();
     }
-    // =====================================================
 
-    // MODIFIED: Now uses cache
     private Map<String, DatabaseConfig> getDatabaseConfigs(Long controllerId) {
         return controllerConfigCache.computeIfAbsent(controllerId, id -> {
             log.info("Cache MISS for controller {} configs - loading from file", id);
@@ -104,7 +98,6 @@ public class OntopService {
         });
     }
 
-    // MODIFIED: Now uses cache
     private List<Path> getObdaFiles(Long controllerId) {
         return obdaFilesCache.computeIfAbsent(controllerId, id -> {
             log.info("Cache MISS for controller {} OBDA files - scanning directory", id);
@@ -120,7 +113,6 @@ public class OntopService {
         });
     }
 
-    // MODIFIED: Now uses cached repository
     private OntopRepository getOrCreateRepository(String cacheKey, DatabaseConfig config, Path obdaPath) {
         return repositoryCache.computeIfAbsent(cacheKey, key -> {
             log.info("Cache MISS for repository {} - creating new instance", key);
@@ -144,7 +136,6 @@ public class OntopService {
         });
     }
 
-    // UNCHANGED: Original method preserved
     private Properties loadDatabaseProperties(Long controllerId) {
         Properties properties = new Properties();
         Path propertiesPath = Paths.get(ONTOP_DIR, controllerId.toString(), "database_configs.properties");
@@ -160,7 +151,6 @@ public class OntopService {
         return properties;
     }
 
-    // UNCHANGED: Original method preserved
     private Map<String, DatabaseConfig> parseDatabaseConfigs(Properties properties) {
         Map<String, DatabaseConfig> configs = new HashMap<>();
 
@@ -191,10 +181,8 @@ public class OntopService {
         return configs;
     }
 
-    // MODIFIED: Uses cached configs, OBDA files, and repositories
     public List<Map<String, String>> executeQuery(Long controllerId, String taxId, String sparqlQuery) {
         try {
-            // USE CACHE instead of loading every time
             Map<String, DatabaseConfig> dbConfigs = getDatabaseConfigs(controllerId);
             List<Path> obdaFiles = getObdaFiles(controllerId);
 
@@ -236,9 +224,8 @@ public class OntopService {
         }
     }
 
-    // MODIFIED: Uses cached repository instead of creating new one each time
     private List<Map<String, String>> queryDatabase(
-            Long controllerId,  // ADD: Need controllerId for cache key
+            Long controllerId,
             DatabaseConfig config,
             Path obdaPath,
             String sparqlQuery,
@@ -248,7 +235,6 @@ public class OntopService {
         String cacheKey = controllerId + "_" + config.name;
 
         try {
-            // USE CACHED REPOSITORY instead of creating new one
             OntopRepository repository = getOrCreateRepository(cacheKey, config, obdaPath);
 
             try (RepositoryConnection conn = repository.getConnection()) {
@@ -290,13 +276,11 @@ public class OntopService {
         return results;
     }
 
-    // UNCHANGED: Original method preserved
     private String extractDatabaseName(Path obdaPath) {
         String filename = obdaPath.getFileName().toString();
         return filename.substring(filename.indexOf("_") + 1, filename.lastIndexOf("_"));
     }
 
-    // UNCHANGED: Original method preserved
     private DatabaseConfig findDatabaseConfig(Map<String, DatabaseConfig> configs, String dbName) {
         return configs.values().stream()
                 .filter(config -> config.name.equalsIgnoreCase(dbName))
@@ -304,7 +288,6 @@ public class OntopService {
                 .orElse(null);
     }
 
-    // UNCHANGED: Original method preserved
     public String getPersonDataQuery() {
         return """
                 PREFIX schema: <http://schema.org/>
@@ -344,7 +327,6 @@ public class OntopService {
                 """;
     }
 
-    // UNCHANGED: Original class preserved
     private static class DatabaseConfig {
         String name;
         String type;
