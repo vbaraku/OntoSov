@@ -116,10 +116,11 @@ public class PolicyEvaluationService {
             );
 
             if (schemaOrgProperty == null) {
-                // Unmapped data - PERMIT by default
+                // Unmapped data - NOT_APPLICABLE: the framework cannot recognise the target, so it
+                // makes no decision rather than recording a permit for data the subject cannot see.
                 PolicyDecisionDTO decision = new PolicyDecisionDTO();
-                decision.setResult(DecisionResult.PERMIT);
-                decision.setReason("Unmapped data is not governed by subject policies - access permitted by default.");
+                decision.setResult(DecisionResult.NOT_APPLICABLE);
+                decision.setReason("Unmapped data is not governed by subject policies - no decision made (not applicable).");
                 decision.setObligations(new ArrayList<>());
                 return decision;
             }
@@ -197,7 +198,10 @@ public class PolicyEvaluationService {
                     request.getAction()
             );
 
-            if (!policyPermitsAction) {
+            // The ODRL check above finds a permission from any group on this element; this check
+            // ties the decision to this specific group, so a group that does not permit the action
+            // denies it even when another group on the same element does (most restrictive wins).
+            if (!policyPermitsAction || !groupPermitsAction(policy, request.getAction())) {
                 String reason = "Policy '" + policy.getName() + "' does not permit action '" + request.getAction() + "'";
                 denyReasons.add(reason);
                 System.out.println("  DENY: " + reason);
@@ -293,10 +297,10 @@ public class PolicyEvaluationService {
             );
 
             if (entityType == null) {
-                // Unmapped table - PERMIT by default
+                // Unmapped table - NOT_APPLICABLE (see property path above)
                 PolicyDecisionDTO decision = new PolicyDecisionDTO();
-                decision.setResult(DecisionResult.PERMIT);
-                decision.setReason("Unmapped table is not governed by subject policies - access permitted by default.");
+                decision.setResult(DecisionResult.NOT_APPLICABLE);
+                decision.setReason("Unmapped table is not governed by subject policies - no decision made (not applicable).");
                 decision.setObligations(new ArrayList<>());
                 return decision;
             }
@@ -378,7 +382,10 @@ public class PolicyEvaluationService {
                     request.getAction()
             );
 
-            if (!policyPermitsAction) {
+            // The ODRL check above finds a permission from any group on this element; this check
+            // ties the decision to this specific group, so a group that does not permit the action
+            // denies it even when another group on the same element does (most restrictive wins).
+            if (!policyPermitsAction || !groupPermitsAction(policy, request.getAction())) {
                 String reason = "Policy '" + policy.getName() + "' does not permit action '" + request.getAction() + "'";
                 denyReasons.add(reason);
                 System.out.println("  DENY: " + reason);
@@ -474,6 +481,18 @@ public class PolicyEvaluationService {
         }
 
         return applicableGroups;
+    }
+
+    /**
+     * Whether this policy group itself permits the requested action. AI training is governed by
+     * the group's AI restrictions (checked in checkAiRestrictions), so it is permitted here only
+     * if the group configures AI restrictions at all.
+     */
+    private boolean groupPermitsAction(PolicyGroupDTO policy, String action) {
+        if ("aiTraining".equals(action)) {
+            return policy.getAiRestrictions() != null && !policy.getAiRestrictions().isEmpty();
+        }
+        return policy.getPermissions() != null && Boolean.TRUE.equals(policy.getPermissions().get(action));
     }
 
     /**
@@ -700,4 +719,4 @@ public class PolicyEvaluationService {
 
         return obligations;
     }
-}
+}
