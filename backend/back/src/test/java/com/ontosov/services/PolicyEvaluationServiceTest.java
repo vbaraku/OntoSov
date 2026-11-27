@@ -993,7 +993,7 @@ class PolicyEvaluationServiceTest {
         }
 
         @Test
-        @DisplayName("Test: Two policies PERMIT different actions should work for each")
+        @DisplayName("Test: Two policies permit different actions - each action is denied by the other policy (most restrictive wins)")
         void testTwoPoliciesPermitDifferentActions() throws IOException {
             // Setup
             setupPropertyAccessMocks();
@@ -1033,8 +1033,8 @@ class PolicyEvaluationServiceTest {
             AccessRequestDTO readRequest = createPropertyAccessRequest("read", TEST_PURPOSE);
             PolicyDecisionDTO readDecision = policyEvaluationService.evaluateAccess(readRequest);
 
-            assertEquals(DecisionResult.PERMIT, readDecision.getResult(),
-                    "Read should be PERMITTED by policy 1");
+            assertEquals(DecisionResult.DENY, readDecision.getResult(),
+                    "Read should be DENIED: policy 2 does not permit read, and every applicable policy must permit");
 
             // Test use action
             when(odrlService.checkPropertyAccess(anyLong(), anyLong(), anyString(), anyString(), eq("use")))
@@ -1043,8 +1043,8 @@ class PolicyEvaluationServiceTest {
             AccessRequestDTO useRequest = createPropertyAccessRequest("use", TEST_PURPOSE);
             PolicyDecisionDTO useDecision = policyEvaluationService.evaluateAccess(useRequest);
 
-            assertEquals(DecisionResult.PERMIT, useDecision.getResult(),
-                    "Use should be PERMITTED by policy 2");
+            assertEquals(DecisionResult.DENY, useDecision.getResult(),
+                    "Use should be DENIED: policy 1 does not permit use, and every applicable policy must permit");
         }
 
         @Test
@@ -1529,8 +1529,8 @@ class PolicyEvaluationServiceTest {
         }
 
         @Test
-        @DisplayName("Test: Unmapped property should return PERMIT (default)")
-        void testUnmappedProperty_shouldReturnPermit() throws IOException {
+        @DisplayName("Test: Unmapped property should return NOT_APPLICABLE")
+        void testUnmappedProperty_shouldReturnNotApplicable() throws IOException {
             // Setup
             when(userRepo.findByTaxid(TEST_TAX_ID)).thenReturn(testSubject);
             when(userRepo.findById(TEST_CONTROLLER_ID)).thenReturn(Optional.of(testController));
@@ -1544,8 +1544,8 @@ class PolicyEvaluationServiceTest {
             PolicyDecisionDTO decision = policyEvaluationService.evaluateAccess(request);
 
             // Assert
-            assertEquals(DecisionResult.PERMIT, decision.getResult(),
-                    "Should be PERMITTED for unmapped data");
+            assertEquals(DecisionResult.NOT_APPLICABLE, decision.getResult(),
+                    "Should be NOT_APPLICABLE for unmapped data");
             assertTrue(decision.getReason().contains("Unmapped"),
                     "Reason should indicate unmapped data");
         }

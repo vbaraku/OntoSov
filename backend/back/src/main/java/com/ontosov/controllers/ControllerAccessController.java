@@ -1,5 +1,6 @@
 package com.ontosov.controllers;
 
+import com.ontosov.dto.DecisionResult;
 import com.ontosov.dto.AccessRequestDTO;
 import com.ontosov.dto.PolicyDecisionDTO;
 import com.ontosov.models.AccessLog;
@@ -9,6 +10,7 @@ import com.ontosov.repositories.UserRepo;
 import com.ontosov.services.BlockchainService;
 import com.ontosov.services.PolicyEvaluationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,35 +44,36 @@ public class ControllerAccessController {
             // 1. Evaluate the access request using PDP
             PolicyDecisionDTO decision = policyEvaluationService.evaluateAccess(request);
 
-            // 2. Log the access attempt to database
+            // 2. Build the off-chain record of the decision
             AccessLog log = createAccessLog(request, decision);
-            AccessLog savedLog = accessLogRepo.save(log);
 
-            // 3. Log to blockchain
-            try {
-                String controllerAddress = "0x" + String.format("%040x", request.getControllerId());
-                String subjectAddress = "0x" + String.format("%040x", savedLog.getSubjectId());
+            // 3. Record the decision on the blockchain. Fails closed: a decision that cannot be
+            // recorded on-chain is not returned to the controller and is not stored off-chain,
+            // so every decision a controller receives has a matching on-chain entry.
+            String controllerAddress = "0x" + String.format("%040x", request.getControllerId());
+            String subjectAddress = "0x" + String.format("%040x", log.getSubjectId() != null ? log.getSubjectId() : 0L);
 
-                BlockchainService.BlockchainLogResult result = blockchainService.logAccess(
-                        controllerAddress,
-                        subjectAddress,
-                        request.getPurpose() != null ? request.getPurpose() : "",
-                        request.getAction(),
-                        decision.getResult().name().equals("PERMIT"),
-                        decision.getPolicyGroupId(),
-                        decision.getPolicyVersion() != null ? java.math.BigInteger.valueOf(decision.getPolicyVersion()) : java.math.BigInteger.ZERO
-                );
+            BlockchainService.BlockchainLogResult result = blockchainService.logAccess(
+                    controllerAddress,
+                    subjectAddress,
+                    request.getPurpose() != null ? request.getPurpose() : "",
+                    request.getAction(),
+                    decision.getResult() == DecisionResult.PERMIT,
+                    decision.getPolicyGroupId(),
+                    decision.getPolicyVersion() != null ? java.math.BigInteger.valueOf(decision.getPolicyVersion()) : java.math.BigInteger.ZERO
+            );
 
-                if (result != null && result.getTransactionHash() != null) {
-                    savedLog.setBlockchainTxHash(result.getTransactionHash());
-                    savedLog.setBlockchainLogIndex(result.getLogIndex());
-                    accessLogRepo.save(savedLog);
-                    System.out.println("Access logged to blockchain. TX: " + result.getTransactionHash() +
-                                     ", Log Index: " + result.getLogIndex());
-                }
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to log to blockchain: " + e.getMessage());
+            if (result == null || result.getTransactionHash() == null) {
+                System.err.println("Access decision could not be recorded on blockchain; refusing to return it");
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body("The access decision could not be recorded on the blockchain, so no decision is returned. Retry later.");
             }
+
+            log.setBlockchainTxHash(result.getTransactionHash());
+            log.setBlockchainLogIndex(result.getLogIndex());
+            accessLogRepo.save(log);
+            System.out.println("Access logged to blockchain. TX: " + result.getTransactionHash() +
+                             ", Log Index: " + result.getLogIndex());
 
             // 4. Return the decision
             return ResponseEntity.ok(decision);
@@ -178,4 +181,4 @@ public class ControllerAccessController {
 
         return log;
     }
-}
+}

@@ -212,13 +212,9 @@ public class PolicyGroupService {
                 }
             }
 
-            // Record policy on blockchain
-            try {
-                recordPolicyOnBlockchain(policyGroupId, policyModel, subjectId);
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to record policy on blockchain: " + e.getMessage());
-                // Don't fail the whole operation if blockchain fails
-            }
+            // Record policy on blockchain. Fails closed: if the hash cannot be recorded,
+            // the exception aborts the transaction and the policy group is not created.
+            recordPolicyOnBlockchain(policyGroupId, policyGroupDTO, subjectId);
 
             dataset.commit();
             return policyGroupId;
@@ -530,12 +526,23 @@ public class PolicyGroupService {
 
                 policyGroup.addProperty(aiRestrictionsProperty, aiRestriction);
             }
-            // Record updated policy on blockchain
-            try {
-                recordPolicyOnBlockchain(groupId, policyModel, subjectId);
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to record policy update on blockchain: " + e.getMessage());
+
+            // Replace transformations (ODS actions)
+            policyGroup.removeAll(transformationsProperty);
+            if (policyGroupDTO.getTransformations() != null) {
+                for (String transformation : policyGroupDTO.getTransformations()) {
+                    policyGroup.addProperty(transformationsProperty, transformation);
+                }
             }
+
+            // Rebuild the group's single ODRL policy from the new content. The asset collection
+            // and its members are left untouched, so the cost does not depend on how many data
+            // elements the group governs.
+            odrlService.rebuildGroupPolicyInTransaction(groupId, policyGroupDTO, subjectId);
+
+            // Record the new version on blockchain. Fails closed: if the hash cannot be recorded,
+            // the exception aborts the transaction and the update is not applied.
+            recordPolicyOnBlockchain(groupId, policyGroupDTO, subjectId);
 
             dataset.commit();
         } catch (Exception e) {
@@ -573,17 +580,17 @@ public class PolicyGroupService {
             // Remove all statements about this policy group
             policyModel.removeAll(policyGroup, null, null);
 
+            // Mark policy as deleted on blockchain before committing. Fails closed: if the
+            // deletion cannot be recorded, the transaction is aborted and the group is kept.
+            String subjectAddress = "0x" + String.format("%040x", subjectId);
+            String deleteTx = blockchainService.deletePolicy(subjectAddress, groupId);
+            if (deleteTx == null) {
+                throw new IllegalStateException("Failed to record policy deletion on blockchain");
+            }
+            System.out.println("Policy marked as deleted on blockchain: " + groupId);
+
             // Now commit everything together
             dataset.commit();
-
-            // Mark policy as deleted on blockchain
-            try {
-                String subjectAddress = "0x" + String.format("%040x", subjectId);
-                blockchainService.deletePolicy(subjectAddress, groupId);
-                System.out.println("Policy marked as deleted on blockchain: " + groupId);
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to mark policy as deleted on blockchain: " + e.getMessage());
-            }
 
         } catch (Exception e) {
             dataset.abort();
@@ -669,49 +676,64 @@ public class PolicyGroupService {
     }
 
     /**
-     * Record a policy on the blockchain
+     * Record a policy on the blockchain. The hash covers the group identifier and the five
+     * dimensions of its content, serialised deterministically by {@link #canonicalPolicyContent},
+     * so anyone holding the policy content can recompute it. Throws if the hash cannot be recorded.
      */
-    private void recordPolicyOnBlockchain(String policyGroupId, Model policyModel, Long subjectId) {
-        try {
-            // Get the policy group resource
-            Resource policyGroup = policyModel.getResource(ONTOSOV_NS + policyGroupId);
+    private void recordPolicyOnBlockchain(String policyGroupId, PolicyGroupDTO policyGroupDTO, Long subjectId) {
+        byte[] policyHash = blockchainService.hashPolicy(canonicalPolicyContent(policyGroupId, policyGroupDTO));
 
-            // Serialize the policy to a string for hashing
-            StringBuilder policyContent = new StringBuilder();
-            policyContent.append("PolicyGroup:").append(policyGroupId).append(";");
+        // Simplified identity mapping: subject ID -> address (see thesis, Section 6.3.1)
+        String subjectAddress = "0x" + String.format("%040x", subjectId);
 
-            // Add permissions
-            StmtIterator permIter = policyGroup.listProperties(permissionProperty);
-            while (permIter.hasNext()) {
-                Statement stmt = permIter.next();
-                policyContent.append(stmt.toString()).append(";");
-            }
-
-            // Add constraints
-            Statement constraintStmt = policyGroup.getProperty(constraintProperty);
-            if (constraintStmt != null) {
-                policyContent.append(constraintStmt.toString()).append(";");
-            }
-
-            // Calculate hash
-            byte[] policyHash = blockchainService.hashPolicy(policyContent.toString());
-
-            // Generate blockchain address for subject (simplified - using subject ID)
-            // In production, you'd have a proper mapping of subject ID to blockchain address
-            String subjectAddress = "0x" + String.format("%040x", subjectId);
-
-            // Record on blockchain
-            String txHash = blockchainService.recordPolicy(subjectAddress, policyGroupId, policyHash);
-
-            if (txHash != null) {
-                System.out.println("Policy recorded on blockchain. TX: " + txHash);
-            } else {
-                System.err.println("Failed to record policy on blockchain");
-            }
-
-        } catch (Exception e) {
-            System.err.println("Error recording policy on blockchain: " + e.getMessage());
-            e.printStackTrace();
+        String txHash = blockchainService.recordPolicy(subjectAddress, policyGroupId, policyHash);
+        if (txHash == null) {
+            throw new IllegalStateException("Failed to record policy on blockchain");
         }
+        System.out.println("Policy recorded on blockchain. TX: " + txHash);
     }
-}
+
+    /**
+     * Deterministic serialisation of a policy group's identifier and its five content dimensions
+     * (permissions, constraints, transformations, consequences, AI restrictions). Keys are sorted
+     * and only enabled permissions are listed, so equal content always yields the same string.
+     */
+    public static String canonicalPolicyContent(String policyGroupId, PolicyGroupDTO dto) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("id=").append(policyGroupId).append('\n');
+
+        List<String> permissions = new ArrayList<>();
+        if (dto.getPermissions() != null) {
+            dto.getPermissions().forEach((action, allowed) -> {
+                if (Boolean.TRUE.equals(allowed)) {
+                    permissions.add(action);
+                }
+            });
+        }
+        Collections.sort(permissions);
+        sb.append("permissions=").append(String.join(",", permissions)).append('\n');
+
+        appendSortedMap(sb, "constraints", dto.getConstraints());
+
+        List<String> transformations = dto.getTransformations() != null
+                ? new ArrayList<>(dto.getTransformations()) : new ArrayList<>();
+        Collections.sort(transformations);
+        sb.append("transformations=").append(String.join(",", transformations)).append('\n');
+
+        appendSortedMap(sb, "consequences", dto.getConsequences());
+        appendSortedMap(sb, "aiRestrictions", dto.getAiRestrictions());
+        return sb.toString();
+    }
+
+    private static void appendSortedMap(StringBuilder sb, String name, Map<String, Object> map) {
+        sb.append(name).append('=');
+        if (map != null) {
+            new TreeMap<>(map).forEach((key, value) -> {
+                if (value != null && !value.toString().isEmpty()) {
+                    sb.append(key).append(':').append(value).append(';');
+                }
+            });
+        }
+        sb.append('\n');
+    }
+}
